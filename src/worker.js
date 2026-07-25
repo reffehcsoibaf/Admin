@@ -6,11 +6,15 @@
 const PROJECTS = {
   bancapro: {
     url: "https://nccpmxavmwipsvzquzeg.supabase.co",
-    anonKey: "sb_publishable_XAjlhNGUMf9EzoqY4C3J9w_FJ1k-SxT"
+    anonKey: "sb_publishable_XAjlhNGUMf9EzoqY4C3J9w_FJ1k-SxT",
+    recordsTable: "apostas",
+    recordsLabel: "Apostas"
   },
   controlefinanceiro: {
     url: "https://arkhifcucqozrpofhceq.supabase.co",
-    anonKey: "sb_publishable_fNGQLgpF3_tOycUEciaznw_b0o2FM8h"
+    anonKey: "sb_publishable_fNGQLgpF3_tOycUEciaznw_b0o2FM8h",
+    recordsTable: "lancamentos",
+    recordsLabel: "Lançamentos"
   }
 };
 
@@ -101,23 +105,51 @@ async function listUsers(project, serviceRoleKey) {
   const data = await resp.json();
   const rawUsers = data.users || data || [];
 
-  const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=id,ai_enabled", {
+  const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=id,ai_enabled,ai_calls_count", {
     headers: {
       apikey: serviceRoleKey,
       Authorization: "Bearer " + serviceRoleKey
     }
   });
   const profiles = profilesResp.ok ? await profilesResp.json() : [];
-  const aiEnabledById = {};
-  profiles.forEach(function (p) { aiEnabledById[p.id] = p.ai_enabled; });
+  const profileById = {};
+  profiles.forEach(function (p) { profileById[p.id] = p; });
+
+  // Conta os registros (apostas/lançamentos) de cada usuário. Usa o header
+  // Prefer: count=exact junto com um select mínimo por usuário — simples e
+  // suficiente para o volume de usuários de um app pessoal.
+  const recordCounts = {};
+  await Promise.all(rawUsers.map(async function (u) {
+    try {
+      const countResp = await fetch(
+        project.url + "/rest/v1/" + project.recordsTable + "?user_id=eq." + u.id + "&select=id",
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: "Bearer " + serviceRoleKey,
+            Prefer: "count=exact",
+            Range: "0-0"
+          }
+        }
+      );
+      const contentRange = countResp.headers.get("content-range"); // formato "0-0/123"
+      const total = contentRange ? parseInt(contentRange.split("/")[1], 10) : null;
+      recordCounts[u.id] = Number.isFinite(total) ? total : null;
+    } catch (e) {
+      recordCounts[u.id] = null;
+    }
+  }));
 
   return rawUsers.map(function (u) {
+    const profile = profileById[u.id];
     return {
       id: u.id,
       email: u.email,
       created_at: u.created_at,
       last_sign_in_at: u.last_sign_in_at,
-      ai_enabled: aiEnabledById.hasOwnProperty(u.id) ? aiEnabledById[u.id] : true
+      ai_enabled: profile && profile.hasOwnProperty("ai_enabled") ? profile.ai_enabled : true,
+      ai_calls_count: profile && profile.hasOwnProperty("ai_calls_count") ? profile.ai_calls_count : 0,
+      records_count: recordCounts[u.id]
     };
   });
 }
@@ -204,7 +236,7 @@ export default {
 
       if (url.pathname === "/api/users" && request.method === "POST") {
         const users = await listUsers(project, serviceRoleKey);
-        return jsonResponse({ users: users });
+        return jsonResponse({ users: users, recordsLabel: project.recordsLabel });
       }
 
       if (url.pathname === "/api/users/delete" && request.method === "POST") {

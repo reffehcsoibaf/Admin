@@ -352,7 +352,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v0.4.0</footer>
+  <footer class="version-footer">Painel Admin v0.5.0</footer>
 </main>
 
 <script>
@@ -376,6 +376,7 @@
   let supabaseClient = null;
   let currentProjectKey = null;
   let currentAccessToken = null;
+  let currentRecordsLabel = "Registros";
 
   const stepProject = document.getElementById("step-project");
   const stepLogin = document.getElementById("step-login");
@@ -531,6 +532,7 @@
         return;
       }
 
+      currentRecordsLabel = data.recordsLabel || "Registros";
       renderUsers(data.users);
     } catch (err) {
       usersContainer.innerHTML = "";
@@ -549,6 +551,8 @@
       "<th scope=\"col\">Cadastrado em</th>" +
       "<th scope=\"col\">Último login</th>" +
       "<th scope=\"col\">Acesso à IA</th>" +
+      "<th scope=\"col\">Usos de IA</th>" +
+      "<th scope=\"col\">" + escapeHtml(currentRecordsLabel) + "</th>" +
       "<th scope=\"col\">Ação</th>" +
       "</tr></thead><tbody>";
 
@@ -563,6 +567,8 @@
         "<input type=\"checkbox\" id=\"" + checkboxId + "\" class=\"ai-toggle\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\"" + (u.ai_enabled ? " checked" : "") + ">" +
         "Ativado</label>" +
         "</td>" +
+        "<td>" + (typeof u.ai_calls_count === "number" ? u.ai_calls_count : "—") + "</td>" +
+        "<td>" + (typeof u.records_count === "number" ? u.records_count : "—") + "</td>" +
         "<td>" +
         "<button type=\"button\" class=\"reset-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Redefinir senha</button>" +
         "<button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button>" +

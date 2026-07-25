@@ -4,6 +4,16 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v0.5.0 — 2026-07-25
+
+- Contagem de usos de IA por usuário (coluna `ai_calls_count` em `profiles`,
+  incrementada via função `increment_ai_calls_count()` chamada pelos Workers
+  do Banca Pro e do Controle Financeiro após cada leitura de IA bem-sucedida)
+- Contagem de registros por usuário (apostas no Banca Pro, lançamentos no
+  Controle Financeiro), exibida como coluna no painel
+- Objetivo: observar o uso real antes de decidir uma cota — nenhum limite
+  aplicado ainda
+
 ## v0.4.0 — 2026-07-25
 
 - Toggle de acesso à IA por usuário (coluna `ai_enabled` na tabela `profiles`)
