@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #1a1d21;
+    --surface: #24282d;
+    --border: #383e45;
+    --text: #e8e9eb;
+    --text-dim: #9aa0a8;
+    --accent: #4f8cff;
+    --accent-hover: #3d76e0;
+    --danger: #e5533d;
+    --danger-bg: #3a2320;
+    --ok: #3fb562;
+    --ok-bg: #1f2e22;
+    --focus: #7fb2ff;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  main {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 4px 0;
+  }
+
+  p.subtitle {
+    color: var(--text-dim);
+    margin: 0 0 24px 0;
+    font-size: 0.95rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+
+  .project-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  a:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .project-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 16px;
+    border-radius: 8px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .project-btn:hover {
+    border-color: var(--accent);
+  }
+
+  .project-btn strong {
+    font-size: 1.05rem;
+  }
+
+  .project-btn span {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    color: var(--text-dim);
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  input[type="email"],
+  input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 1rem;
+  }
+
+  .primary-btn {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    padding: 12px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
+  .primary-btn:hover {
+    background: var(--accent-hover);
+  }
+
+  .primary-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    padding: 4px 0;
+    font-size: 0.85rem;
+    text-decoration: underline;
+    margin-top: 16px;
+  }
+
+  .link-btn:hover {
+    color: var(--text);
+  }
+
+  [role="alert"] {
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+  }
+
+  .alert-error {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
+    color: #ffb3a5;
+  }
+
+  .alert-ok {
+    background: var(--ok-bg);
+    border: 1px solid var(--ok);
+    color: #a9e6bb;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .welcome h2 {
+    margin-top: 0;
+  }
+
+  .welcome .meta {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-bottom: 24px;
+  }
+
+  .placeholder-list {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .status-line {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 16px;
+  }
+
+  table.user-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+
+  .user-table th,
+  .user-table td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+
+  .user-table th {
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  .remove-btn {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
+    color: #ffb3a5;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+
+  .remove-btn:hover {
+    background: var(--danger);
+    color: #fff;
+  }
+
+  .remove-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .users-empty {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    padding: 12px 0;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Painel Admin</h1>
+  <p class="subtitle" id="subtitle">Escolha o projeto que deseja gerenciar.</p>
+
+  <div class="card">
+
+    <!-- Etapa 1: escolha do projeto -->
+    <section id="step-project" class="project-choice" aria-label="Escolha do projeto">
+      <button type="button" class="project-btn" data-project="bancapro">
+        <strong>Banca Pro</strong>
+        <span>Controle de apostas esportivas</span>
+      </button>
+      <button type="button" class="project-btn" data-project="controlefinanceiro">
+        <strong>Controle Financeiro</strong>
+        <span>Gestão financeira pessoal</span>
+      </button>
+    </section>
+
+    <!-- Etapa 2: login -->
+    <section id="step-login" class="hidden" aria-label="Login administrativo">
+      <div id="login-alert"></div>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" name="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Senha</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="primary-btn" id="login-submit">Entrar</button>
+      </form>
+      <button type="button" class="link-btn" id="back-to-project">← Escolher outro projeto</button>
+    </section>
+
+    <!-- Etapa 3: painel -->
+    <section id="step-panel" class="hidden welcome" aria-label="Painel administrativo">
+      <h2>Usuários</h2>
+      <p class="meta" id="panel-meta"></p>
+      <div id="panel-alert"></div>
+      <div id="users-container">
+        <p class="users-empty" id="users-loading">Carregando usuários...</p>
+      </div>
+      <button type="button" class="link-btn" id="logout-btn">Sair e escolher outro projeto</button>
+    </section>
+
+  </div>
+
+  <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // Configuração dos projetos Supabase
+  const PROJECTS = {
+    bancapro: {
+      label: "Banca Pro",
+      url: "https://nccpmxavmwipsvzquzeg.supabase.co",
+      anonKey: "sb_publishable_XAjlhNGUMf9EzoqY4C3J9w_FJ1k-SxT"
+    },
+    controlefinanceiro: {
+      label: "Controle Financeiro",
+      url: "https://arkhifcucqozrpofhceq.supabase.co",
+      anonKey: "sb_publishable_fNGQLgpF3_tOycUEciaznw_b0o2FM8h"
+    }
+  };
+
+  let supabaseClient = null;
+  let currentProjectKey = null;
+  let currentAccessToken = null;
+
+  const stepProject = document.getElementById("step-project");
+  const stepLogin = document.getElementById("step-login");
+  const stepPanel = document.getElementById("step-panel");
+  const subtitle = document.getElementById("subtitle");
+  const loginAlert = document.getElementById("login-alert");
+  const loginForm = document.getElementById("login-form");
+  const loginSubmit = document.getElementById("login-submit");
+  const backToProject = document.getElementById("back-to-project");
+  const logoutBtn = document.getElementById("logout-btn");
+  const panelMeta = document.getElementById("panel-meta");
+  const panelAlert = document.getElementById("panel-alert");
+  const usersContainer = document.getElementById("users-container");
+  const statusLine = document.getElementById("status-line");
+
+  function showStep(step) {
+    stepProject.classList.add("hidden");
+    stepLogin.classList.add("hidden");
+    stepPanel.classList.add("hidden");
+    step.classList.remove("hidden");
+  }
+
+  function setAlert(container, message, type) {
+    container.innerHTML = "";
+    if (!message) return;
+    const div = document.createElement("div");
+    div.setAttribute("role", "alert");
+    div.className = type === "error" ? "alert-error" : "alert-ok";
+    div.textContent = message;
+    container.appendChild(div);
+  }
+
+  function selectProject(key) {
+    try {
+      if (!window.supabase || typeof window.supabase.createClient !== "function") {
+        statusLine.textContent = "Erro: a biblioteca do Supabase não carregou. Verifique sua conexão com a internet e recarregue a página.";
+        return;
+      }
+      currentProjectKey = key;
+      const project = PROJECTS[key];
+      supabaseClient = window.supabase.createClient(project.url, project.anonKey);
+      subtitle.textContent = "Projeto: " + project.label;
+      setAlert(loginAlert, "", null);
+      loginForm.reset();
+      showStep(stepLogin);
+      document.getElementById("email").focus();
+    } catch (err) {
+      statusLine.textContent = "Erro ao selecionar o projeto: " + err.message;
+    }
+  }
+
+  document.querySelectorAll(".project-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      selectProject(btn.getAttribute("data-project"));
+    });
+  });
+
+  backToProject.addEventListener("click", function () {
+    subtitle.textContent = "Escolha o projeto que deseja gerenciar.";
+    showStep(stepProject);
+  });
+
+  loginForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setAlert(loginAlert, "", null);
+    loginSubmit.disabled = true;
+    loginSubmit.textContent = "Entrando...";
+    statusLine.textContent = "";
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    try {
+      const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+      if (authError) {
+        setAlert(loginAlert, "Não foi possível entrar: " + authError.message, "error");
+        return;
+      }
+
+      const userId = authData.user.id;
+
+      const { data: profile, error: profileError } = await supabaseClient
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", userId)
+        .single();
+
+      if (profileError) {
+        setAlert(loginAlert, "Login ok, mas não foi possível checar a permissão de admin: " + profileError.message, "error");
+        await supabaseClient.auth.signOut();
+        return;
+      }
+
+      if (!profile || profile.is_admin !== true) {
+        setAlert(loginAlert, "Este usuário não tem permissão de administrador neste projeto.", "error");
+        await supabaseClient.auth.signOut();
+        return;
+      }
+
+      currentAccessToken = authData.session.access_token;
+      panelMeta.textContent = PROJECTS[currentProjectKey].label + " — conectado como " + email;
+      showStep(stepPanel);
+      statusLine.textContent = "";
+      loadUsers();
+    } catch (err) {
+      setAlert(loginAlert, "Erro inesperado: " + err.message, "error");
+    } finally {
+      loginSubmit.disabled = false;
+      loginSubmit.textContent = "Entrar";
+    }
+  });
+
+  logoutBtn.addEventListener("click", async function () {
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    }
+    currentAccessToken = null;
+    subtitle.textContent = "Escolha o projeto que deseja gerenciar.";
+    showStep(stepProject);
+  });
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function formatDate(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function loadUsers() {
+    setAlert(panelAlert, "", null);
+    usersContainer.innerHTML = '<p class="users-empty" id="users-loading">Carregando usuários...</p>';
+
+    try {
+      const resp = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        usersContainer.innerHTML = "";
+        setAlert(panelAlert, data.error || "Erro ao carregar usuários.", "error");
+        return;
+      }
+
+      renderUsers(data.users);
+    } catch (err) {
+      usersContainer.innerHTML = "";
+      setAlert(panelAlert, "Erro ao carregar usuários: " + err.message, "error");
+    }
+  }
+
+  function renderUsers(users) {
+    if (!users.length) {
+      usersContainer.innerHTML = '<p class="users-empty">Nenhum usuário cadastrado neste projeto.</p>';
+      return;
+    }
+
+    let html = '<table class="user-table"><thead><tr>' +
+      "<th scope=\"col\">E-mail</th>" +
+      "<th scope=\"col\">Cadastrado em</th>" +
+      "<th scope=\"col\">Último login</th>" +
+      "<th scope=\"col\">Ação</th>" +
+      "</tr></thead><tbody>";
+
+    users.forEach(function (u) {
+      html += "<tr>" +
+        "<td>" + escapeHtml(u.email || "—") + "</td>" +
+        "<td>" + formatDate(u.created_at) + "</td>" +
+        "<td>" + formatDate(u.last_sign_in_at) + "</td>" +
+        "<td><button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button></td>" +
+        "</tr>";
+    });
+
+    html += "</tbody></table>";
+    usersContainer.innerHTML = html;
+
+    usersContainer.querySelectorAll(".remove-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        handleRemoveUser(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
+      });
+    });
+  }
+
+  async function handleRemoveUser(userId, email, btn) {
+    const confirmed = window.confirm("Remover o usuário " + email + "? Essa ação não pode ser desfeita.");
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    btn.textContent = "Removendo...";
+    setAlert(panelAlert, "", null);
+
+    try {
+      const resp = await fetch("/api/users/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setAlert(panelAlert, data.error || "Erro ao remover usuário.", "error");
+        btn.disabled = false;
+        btn.textContent = "Remover";
+        return;
+      }
+
+      setAlert(panelAlert, "Usuário " + email + " removido.", "ok");
+      loadUsers();
+    } catch (err) {
+      setAlert(panelAlert, "Erro ao remover usuário: " + err.message, "error");
+      btn.disabled = false;
+      btn.textContent = "Remover";
+    }
+  }
+
+})();
+</script>
+
+</body>
+</html>
