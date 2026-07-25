@@ -101,12 +101,23 @@ async function listUsers(project, serviceRoleKey) {
   const data = await resp.json();
   const rawUsers = data.users || data || [];
 
+  const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=id,ai_enabled", {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey
+    }
+  });
+  const profiles = profilesResp.ok ? await profilesResp.json() : [];
+  const aiEnabledById = {};
+  profiles.forEach(function (p) { aiEnabledById[p.id] = p.ai_enabled; });
+
   return rawUsers.map(function (u) {
     return {
       id: u.id,
       email: u.email,
       created_at: u.created_at,
-      last_sign_in_at: u.last_sign_in_at
+      last_sign_in_at: u.last_sign_in_at,
+      ai_enabled: aiEnabledById.hasOwnProperty(u.id) ? aiEnabledById[u.id] : true
     };
   });
 }
@@ -140,6 +151,24 @@ async function resetPassword(project, serviceRoleKey, userId, newPassword) {
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error("Falha ao redefinir senha: " + text);
+  }
+}
+
+async function setAiEnabled(project, serviceRoleKey, userId, aiEnabled) {
+  const resp = await fetch(project.url + "/rest/v1/profiles?id=eq." + userId, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({ ai_enabled: aiEnabled })
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao atualizar acesso à IA: " + text);
   }
 }
 
@@ -192,6 +221,11 @@ export default {
           return jsonResponse({ error: "A nova senha precisa ter ao menos 8 caracteres." }, 400);
         }
         await resetPassword(project, serviceRoleKey, body.userId, newPassword);
+        return jsonResponse({ ok: true });
+      }
+
+      if (url.pathname === "/api/users/set-ai-access" && request.method === "POST") {
+        await setAiEnabled(project, serviceRoleKey, body.userId, body.aiEnabled === true);
         return jsonResponse({ ok: true });
       }
 

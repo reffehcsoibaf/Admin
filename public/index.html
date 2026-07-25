@@ -274,6 +274,19 @@
     font-size: 1rem;
   }
 
+  .ai-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .ai-toggle-label input {
+    width: 16px;
+    height: 16px;
+  }
+
   .users-empty {
     color: var(--text-dim);
     font-size: 0.9rem;
@@ -339,7 +352,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v0.3.0</footer>
+  <footer class="version-footer">Painel Admin v0.4.0</footer>
 </main>
 
 <script>
@@ -535,14 +548,21 @@
       "<th scope=\"col\">E-mail</th>" +
       "<th scope=\"col\">Cadastrado em</th>" +
       "<th scope=\"col\">Último login</th>" +
+      "<th scope=\"col\">Acesso à IA</th>" +
       "<th scope=\"col\">Ação</th>" +
       "</tr></thead><tbody>";
 
     users.forEach(function (u) {
+      const checkboxId = "ai-toggle-" + u.id;
       html += "<tr>" +
         "<td>" + escapeHtml(u.email || "—") + "</td>" +
         "<td>" + formatDate(u.created_at) + "</td>" +
         "<td>" + formatDate(u.last_sign_in_at) + "</td>" +
+        "<td>" +
+        "<label class=\"ai-toggle-label\" for=\"" + checkboxId + "\">" +
+        "<input type=\"checkbox\" id=\"" + checkboxId + "\" class=\"ai-toggle\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\"" + (u.ai_enabled ? " checked" : "") + ">" +
+        "Ativado</label>" +
+        "</td>" +
         "<td>" +
         "<button type=\"button\" class=\"reset-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Redefinir senha</button>" +
         "<button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button>" +
@@ -564,6 +584,40 @@
         handleResetPassword(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
       });
     });
+
+    usersContainer.querySelectorAll(".ai-toggle").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        handleToggleAiAccess(checkbox.getAttribute("data-user-id"), checkbox.getAttribute("data-user-email"), checkbox);
+      });
+    });
+  }
+
+  async function handleToggleAiAccess(userId, email, checkbox) {
+    const novoValor = checkbox.checked;
+    checkbox.disabled = true;
+    setAlert(panelAlert, "", null);
+
+    try {
+      const resp = await fetch("/api/users/set-ai-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId, aiEnabled: novoValor })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        checkbox.checked = !novoValor;
+        setAlert(panelAlert, data.error || "Erro ao atualizar acesso à IA.", "error");
+        return;
+      }
+
+      setAlert(panelAlert, "Acesso à IA " + (novoValor ? "ativado" : "desativado") + " para " + email + ".", "ok");
+    } catch (err) {
+      checkbox.checked = !novoValor;
+      setAlert(panelAlert, "Erro ao atualizar acesso à IA: " + err.message, "error");
+    } finally {
+      checkbox.disabled = false;
+    }
   }
 
   function generatePassword() {
