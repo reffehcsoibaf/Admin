@@ -4,6 +4,17 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v0.6.0 — 2026-07-25
+
+- Toggle de envio de documentos por usuário, só no Controle Financeiro
+  (coluna `documents_enabled` em `profiles`, exibida apenas quando esse
+  projeto está selecionado)
+- Bloqueio real via políticas RLS restritivas no Storage (bucket
+  `documentos`) e na tabela `documentos_armazenados`, somadas às políticas
+  já existentes sem substituí-las
+- Ocultação visual do botão de guardar arquivo e do checkbox "guardar
+  também" no Controle Financeiro quando desativado
+
 ## v0.5.0 — 2026-07-25
 
 - Contagem de usos de IA por usuário (coluna `ai_calls_count` em `profiles`,

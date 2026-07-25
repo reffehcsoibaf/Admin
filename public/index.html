@@ -352,7 +352,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v0.5.0</footer>
+  <footer class="version-footer">Painel Admin v0.6.0</footer>
 </main>
 
 <script>
@@ -377,6 +377,7 @@
   let currentProjectKey = null;
   let currentAccessToken = null;
   let currentRecordsLabel = "Registros";
+  let currentHasDocumentsToggle = false;
 
   const stepProject = document.getElementById("step-project");
   const stepLogin = document.getElementById("step-login");
@@ -533,6 +534,7 @@
       }
 
       currentRecordsLabel = data.recordsLabel || "Registros";
+      currentHasDocumentsToggle = !!data.hasDocumentsToggle;
       renderUsers(data.users);
     } catch (err) {
       usersContainer.innerHTML = "";
@@ -552,12 +554,14 @@
       "<th scope=\"col\">Último login</th>" +
       "<th scope=\"col\">Acesso à IA</th>" +
       "<th scope=\"col\">Usos de IA</th>" +
+      (currentHasDocumentsToggle ? "<th scope=\"col\">Envio de Documentos</th>" : "") +
       "<th scope=\"col\">" + escapeHtml(currentRecordsLabel) + "</th>" +
       "<th scope=\"col\">Ação</th>" +
       "</tr></thead><tbody>";
 
     users.forEach(function (u) {
       const checkboxId = "ai-toggle-" + u.id;
+      const docCheckboxId = "doc-toggle-" + u.id;
       html += "<tr>" +
         "<td>" + escapeHtml(u.email || "—") + "</td>" +
         "<td>" + formatDate(u.created_at) + "</td>" +
@@ -568,6 +572,13 @@
         "Ativado</label>" +
         "</td>" +
         "<td>" + (typeof u.ai_calls_count === "number" ? u.ai_calls_count : "—") + "</td>" +
+        (currentHasDocumentsToggle ?
+          "<td>" +
+          "<label class=\"ai-toggle-label\" for=\"" + docCheckboxId + "\">" +
+          "<input type=\"checkbox\" id=\"" + docCheckboxId + "\" class=\"doc-toggle\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\"" + (u.documents_enabled ? " checked" : "") + ">" +
+          "Ativado</label>" +
+          "</td>"
+          : "") +
         "<td>" + (typeof u.records_count === "number" ? u.records_count : "—") + "</td>" +
         "<td>" +
         "<button type=\"button\" class=\"reset-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Redefinir senha</button>" +
@@ -596,6 +607,12 @@
         handleToggleAiAccess(checkbox.getAttribute("data-user-id"), checkbox.getAttribute("data-user-email"), checkbox);
       });
     });
+
+    usersContainer.querySelectorAll(".doc-toggle").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        handleToggleDocumentsAccess(checkbox.getAttribute("data-user-id"), checkbox.getAttribute("data-user-email"), checkbox);
+      });
+    });
   }
 
   async function handleToggleAiAccess(userId, email, checkbox) {
@@ -621,6 +638,34 @@
     } catch (err) {
       checkbox.checked = !novoValor;
       setAlert(panelAlert, "Erro ao atualizar acesso à IA: " + err.message, "error");
+    } finally {
+      checkbox.disabled = false;
+    }
+  }
+
+  async function handleToggleDocumentsAccess(userId, email, checkbox) {
+    const novoValor = checkbox.checked;
+    checkbox.disabled = true;
+    setAlert(panelAlert, "", null);
+
+    try {
+      const resp = await fetch("/api/users/set-documents-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId, documentsEnabled: novoValor })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        checkbox.checked = !novoValor;
+        setAlert(panelAlert, data.error || "Erro ao atualizar acesso a documentos.", "error");
+        return;
+      }
+
+      setAlert(panelAlert, "Envio de documentos " + (novoValor ? "ativado" : "desativado") + " para " + email + ".", "ok");
+    } catch (err) {
+      checkbox.checked = !novoValor;
+      setAlert(panelAlert, "Erro ao atualizar acesso a documentos: " + err.message, "error");
     } finally {
       checkbox.disabled = false;
     }

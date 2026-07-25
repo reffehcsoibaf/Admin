@@ -14,7 +14,8 @@ const PROJECTS = {
     url: "https://arkhifcucqozrpofhceq.supabase.co",
     anonKey: "sb_publishable_fNGQLgpF3_tOycUEciaznw_b0o2FM8h",
     recordsTable: "lancamentos",
-    recordsLabel: "Lançamentos"
+    recordsLabel: "Lançamentos",
+    hasDocumentsToggle: true
   }
 };
 
@@ -105,7 +106,8 @@ async function listUsers(project, serviceRoleKey) {
   const data = await resp.json();
   const rawUsers = data.users || data || [];
 
-  const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=id,ai_enabled,ai_calls_count", {
+  const camposProfile = "id,ai_enabled,ai_calls_count" + (project.hasDocumentsToggle ? ",documents_enabled" : "");
+  const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=" + camposProfile, {
     headers: {
       apikey: serviceRoleKey,
       Authorization: "Bearer " + serviceRoleKey
@@ -149,6 +151,7 @@ async function listUsers(project, serviceRoleKey) {
       last_sign_in_at: u.last_sign_in_at,
       ai_enabled: profile && profile.hasOwnProperty("ai_enabled") ? profile.ai_enabled : true,
       ai_calls_count: profile && profile.hasOwnProperty("ai_calls_count") ? profile.ai_calls_count : 0,
+      documents_enabled: project.hasDocumentsToggle ? (profile && profile.hasOwnProperty("documents_enabled") ? profile.documents_enabled : true) : null,
       records_count: recordCounts[u.id]
     };
   });
@@ -204,6 +207,24 @@ async function setAiEnabled(project, serviceRoleKey, userId, aiEnabled) {
   }
 }
 
+async function setDocumentsEnabled(project, serviceRoleKey, userId, documentsEnabled) {
+  const resp = await fetch(project.url + "/rest/v1/profiles?id=eq." + userId, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({ documents_enabled: documentsEnabled })
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao atualizar acesso a documentos: " + text);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -236,7 +257,15 @@ export default {
 
       if (url.pathname === "/api/users" && request.method === "POST") {
         const users = await listUsers(project, serviceRoleKey);
-        return jsonResponse({ users: users, recordsLabel: project.recordsLabel });
+        return jsonResponse({ users: users, recordsLabel: project.recordsLabel, hasDocumentsToggle: !!project.hasDocumentsToggle });
+      }
+
+      if (url.pathname === "/api/users/set-documents-access" && request.method === "POST") {
+        if (!project.hasDocumentsToggle) {
+          return jsonResponse({ error: "Este projeto não tem controle de envio de documentos." }, 400);
+        }
+        await setDocumentsEnabled(project, serviceRoleKey, body.userId, body.documentsEnabled === true);
+        return jsonResponse({ ok: true });
       }
 
       if (url.pathname === "/api/users/delete" && request.method === "POST") {
