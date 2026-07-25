@@ -240,6 +240,40 @@
     cursor: not-allowed;
   }
 
+  .reset-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-right: 6px;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--accent);
+  }
+
+  .reset-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .new-password-box {
+    background: var(--ok-bg);
+    border: 1px solid var(--ok);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+  }
+
+  .new-password-box strong {
+    user-select: all;
+    font-family: monospace;
+    font-size: 1rem;
+  }
+
   .users-empty {
     color: var(--text-dim);
     font-size: 0.9rem;
@@ -501,7 +535,10 @@
         "<td>" + escapeHtml(u.email || "—") + "</td>" +
         "<td>" + formatDate(u.created_at) + "</td>" +
         "<td>" + formatDate(u.last_sign_in_at) + "</td>" +
-        "<td><button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button></td>" +
+        "<td>" +
+        "<button type=\"button\" class=\"reset-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Redefinir senha</button>" +
+        "<button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button>" +
+        "</td>" +
         "</tr>";
     });
 
@@ -513,6 +550,62 @@
         handleRemoveUser(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
       });
     });
+
+    usersContainer.querySelectorAll(".reset-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        handleResetPassword(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
+      });
+    });
+  }
+
+  function generatePassword() {
+    const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let result = "";
+    const array = new Uint32Array(12);
+    crypto.getRandomValues(array);
+    for (let i = 0; i < 12; i++) {
+      result += chars[array[i] % chars.length];
+    }
+    return result;
+  }
+
+  async function handleResetPassword(userId, email, btn) {
+    const confirmed = window.confirm("Redefinir a senha de " + email + "? Uma nova senha será gerada.");
+    if (!confirmed) return;
+
+    btn.disabled = true;
+    btn.textContent = "Redefinindo...";
+    setAlert(panelAlert, "", null);
+
+    const newPassword = generatePassword();
+
+    try {
+      const resp = await fetch("/api/users/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId, newPassword: newPassword })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setAlert(panelAlert, data.error || "Erro ao redefinir senha.", "error");
+        btn.disabled = false;
+        btn.textContent = "Redefinir senha";
+        return;
+      }
+
+      panelAlert.innerHTML = "";
+      const box = document.createElement("div");
+      box.className = "new-password-box";
+      box.setAttribute("role", "alert");
+      box.innerHTML = "Nova senha para <strong>" + escapeHtml(email) + "</strong>: <strong>" + escapeHtml(newPassword) + "</strong> — copie e envie ao usuário por fora do painel.";
+      panelAlert.appendChild(box);
+    } catch (err) {
+      setAlert(panelAlert, "Erro ao redefinir senha: " + err.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Redefinir senha";
+    }
   }
 
   async function handleRemoveUser(userId, email, btn) {
