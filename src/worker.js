@@ -8,7 +8,8 @@ const PROJECTS = {
     url: "https://nccpmxavmwipsvzquzeg.supabase.co",
     anonKey: "sb_publishable_XAjlhNGUMf9EzoqY4C3J9w_FJ1k-SxT",
     recordsTable: "apostas",
-    recordsLabel: "Apostas"
+    recordsLabel: "Apostas",
+    hasDetailedAiCounts: true
   },
   controlefinanceiro: {
     url: "https://arkhifcucqozrpofhceq.supabase.co",
@@ -42,20 +43,29 @@ function getServiceRoleKey(env, projectKey) {
 
 // Confere o token de acesso do usuário logado e se ele é admin no projeto pedido.
 // Retorna { ok: true, userId } ou { ok: false, status, message }
-async function requireAdmin(project, projectKey, accessToken, env) {
+// Projeto usado como "porta de entrada" única do painel: a autenticação e a
+// checagem de is_admin sempre acontecem aqui, não importa qual projeto o
+// admin queira gerenciar depois de logado.
+const ADMIN_PROJECT_KEY = "controlefinanceiro";
+
+// Confere o token de acesso do usuário logado e se ele é admin no projeto de
+// identidade (ADMIN_PROJECT_KEY). Retorna { ok: true, userId } ou
+// { ok: false, status, message }
+async function requireAdmin(accessToken, env) {
   if (!accessToken) {
     return { ok: false, status: 401, message: "Token de acesso ausente." };
   }
 
-  const serviceRoleKey = getServiceRoleKey(env, projectKey);
+  const adminProject = PROJECTS[ADMIN_PROJECT_KEY];
+  const serviceRoleKey = getServiceRoleKey(env, ADMIN_PROJECT_KEY);
   if (!serviceRoleKey) {
-    return { ok: false, status: 500, message: "Projeto desconhecido ou sem service role configurada." };
+    return { ok: false, status: 500, message: "Projeto de identidade sem service role configurada." };
   }
 
   // 1. Descobre quem é o usuário a partir do token dele (validação normal, não-admin)
-  const userResp = await fetch(project.url + "/auth/v1/user", {
+  const userResp = await fetch(adminProject.url + "/auth/v1/user", {
     headers: {
-      apikey: project.anonKey,
+      apikey: adminProject.anonKey,
       Authorization: "Bearer " + accessToken
     }
   });
@@ -67,9 +77,9 @@ async function requireAdmin(project, projectKey, accessToken, env) {
   const userData = await userResp.json();
   const userId = userData.id;
 
-  // 2. Confere is_admin na tabela profiles, usando a service role key
+  // 2. Confere is_admin na tabela profiles do projeto de identidade
   const profileResp = await fetch(
-    project.url + "/rest/v1/profiles?id=eq." + userId + "&select=is_admin",
+    adminProject.url + "/rest/v1/profiles?id=eq." + userId + "&select=is_admin",
     {
       headers: {
         apikey: serviceRoleKey,
@@ -106,7 +116,9 @@ async function listUsers(project, serviceRoleKey) {
   const data = await resp.json();
   const rawUsers = data.users || data || [];
 
-  const camposProfile = "id,ai_enabled,ai_calls_count" + (project.hasDocumentsToggle ? ",documents_enabled" : "");
+  const camposProfile = "id,ai_enabled,ai_calls_count"
+    + (project.hasDocumentsToggle ? ",documents_enabled" : "")
+    + (project.hasDetailedAiCounts ? ",ai_calls_bilhete,ai_calls_estatisticas" : "");
   const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=" + camposProfile, {
     headers: {
       apikey: serviceRoleKey,
@@ -151,6 +163,8 @@ async function listUsers(project, serviceRoleKey) {
       last_sign_in_at: u.last_sign_in_at,
       ai_enabled: profile && profile.hasOwnProperty("ai_enabled") ? profile.ai_enabled : true,
       ai_calls_count: profile && profile.hasOwnProperty("ai_calls_count") ? profile.ai_calls_count : 0,
+      ai_calls_bilhete: project.hasDetailedAiCounts ? (profile && profile.ai_calls_bilhete) || 0 : null,
+      ai_calls_estatisticas: project.hasDetailedAiCounts ? (profile && profile.ai_calls_estatisticas) || 0 : null,
       documents_enabled: project.hasDocumentsToggle ? (profile && profile.hasOwnProperty("documents_enabled") ? profile.documents_enabled : true) : null,
       records_count: recordCounts[u.id]
     };
@@ -248,7 +262,7 @@ export default {
       }
 
       const accessToken = body.accessToken;
-      const auth = await requireAdmin(project, projectKey, accessToken, env);
+      const auth = await requireAdmin(accessToken, env);
       if (!auth.ok) {
         return jsonResponse({ error: auth.message }, auth.status);
       }
@@ -257,7 +271,7 @@ export default {
 
       if (url.pathname === "/api/users" && request.method === "POST") {
         const users = await listUsers(project, serviceRoleKey);
-        return jsonResponse({ users: users, recordsLabel: project.recordsLabel, hasDocumentsToggle: !!project.hasDocumentsToggle });
+        return jsonResponse({ users: users, recordsLabel: project.recordsLabel, hasDocumentsToggle: !!project.hasDocumentsToggle, hasDetailedAiCounts: !!project.hasDetailedAiCounts });
       }
 
       if (url.pathname === "/api/users/set-documents-access" && request.method === "POST") {

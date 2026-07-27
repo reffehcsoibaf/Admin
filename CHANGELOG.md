@@ -4,6 +4,25 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v0.8.0 — 2026-07-25
+
+- Login único: a autenticação e a checagem de admin sempre acontecem contra
+  o projeto Controle Financeiro (ADMIN_PROJECT_KEY), independente de qual
+  projeto será gerenciado depois
+- Depois de logado, a escolha de projeto (Banca Pro / Controle Financeiro)
+  não exige um novo login — a troca entre projetos é livre
+- Conta de admin dedicada (fabioscheffermoraes@me.com) criada no Controle
+  Financeiro para servir como porta de entrada do painel
+
+## v0.7.0 — 2026-07-25
+
+- Contadores de uso de IA separados por tipo no Banca Pro: "IA: Bilhetes"
+  (leitura de bilhete por foto/texto) e "IA: Estatísticas" (análise de risco)
+- Colunas `ai_calls_bilhete` e `ai_calls_estatisticas` em `profiles`,
+  incrementadas via funções dedicadas chamadas pelo Worker do Banca Pro
+- No Controle Financeiro (só uma função de IA), a coluna "Usos de IA"
+  continua mostrando o total único, sem separação
+
 ## v0.6.0 — 2026-07-25
 
 - Toggle de envio de documentos por usuário, só no Controle Financeiro
