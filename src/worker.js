@@ -118,7 +118,7 @@ async function listUsers(project, serviceRoleKey) {
 
   const camposProfile = "id,ai_enabled,ai_calls_count"
     + (project.hasDocumentsToggle ? ",documents_enabled" : "")
-    + (project.hasDetailedAiCounts ? ",ai_calls_bilhete,ai_calls_estatisticas" : "");
+    + (project.hasDetailedAiCounts ? ",ai_calls_bilhete,ai_calls_estatisticas,ai_calls_liga" : "");
   const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=" + camposProfile, {
     headers: {
       apikey: serviceRoleKey,
@@ -154,6 +154,28 @@ async function listUsers(project, serviceRoleKey) {
     }
   }));
 
+  // Uso de armazenamento por usuário (só em projetos com bucket de documentos).
+  const storageByUserId = {};
+  if (project.hasDocumentsToggle) {
+    try {
+      const storageResp = await fetch(project.url + "/rest/v1/rpc/storage_usage_por_usuario", {
+        method: "POST",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: "Bearer " + serviceRoleKey,
+          "Content-Type": "application/json"
+        },
+        body: "{}"
+      });
+      if (storageResp.ok) {
+        const rows = await storageResp.json();
+        rows.forEach(function (r) { storageByUserId[r.user_id] = r.total_bytes; });
+      }
+    } catch (e) {
+      // segue sem esse dado se a chamada falhar; não deve travar a listagem
+    }
+  }
+
   return rawUsers.map(function (u) {
     const profile = profileById[u.id];
     return {
@@ -165,7 +187,9 @@ async function listUsers(project, serviceRoleKey) {
       ai_calls_count: profile && profile.hasOwnProperty("ai_calls_count") ? profile.ai_calls_count : 0,
       ai_calls_bilhete: project.hasDetailedAiCounts ? (profile && profile.ai_calls_bilhete) || 0 : null,
       ai_calls_estatisticas: project.hasDetailedAiCounts ? (profile && profile.ai_calls_estatisticas) || 0 : null,
+      ai_calls_liga: project.hasDetailedAiCounts ? (profile && profile.ai_calls_liga) || 0 : null,
       documents_enabled: project.hasDocumentsToggle ? (profile && profile.hasOwnProperty("documents_enabled") ? profile.documents_enabled : true) : null,
+      storage_bytes: project.hasDocumentsToggle ? (storageByUserId.hasOwnProperty(u.id) ? Number(storageByUserId[u.id]) : 0) : null,
       records_count: recordCounts[u.id]
     };
   });

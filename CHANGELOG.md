@@ -4,6 +4,14 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v0.9.0 — 2026-07-27
+
+- Nova coluna "IA: Busca de Liga" no Banca Pro (terceiro tipo de uso de IA,
+  além de Bilhetes e Estatísticas; coluna `ai_calls_liga` em `profiles`)
+- Nova coluna "Armazenamento" no Controle Financeiro, mostrando o espaço em
+  MB usado por cada usuário no bucket de documentos (via função
+  `storage_usage_por_usuario()`), só informativo, sem limite aplicado
+
 ## v0.8.0 — 2026-07-25
 
 - Login único: a autenticação e a checagem de admin sempre acontecem contra
