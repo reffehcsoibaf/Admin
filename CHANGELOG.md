@@ -4,6 +4,29 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.0.0 — 2026-08-02
+
+- Reforma completa para o modelo de projeto único (Hub): Banca Pro, Controle
+  Financeiro e Plano de Saúde agora vivem no mesmo projeto Supabase, então
+  login e checagem de admin acontecem uma única vez, sempre contra o Hub
+- Seletor de "projeto" virou seletor de "módulo" — a navegação é a mesma,
+  mas agora escolhe qual conjunto de dados exibir, não qual projeto logar
+- Nova coluna "Módulo habilitado" em todas as tabelas: concede ou revoga o
+  acesso de um usuário a um módulo inteiro (`habilitado` em
+  `profiles_modulos`), algo que não existia antes — cada usuário podia ser
+  bloqueado só por app individual (IA/documentos), nunca do módulo como um
+  todo
+- Toggles de IA e de documentos migraram de `profiles` (por projeto) para
+  `profiles_modulos` (por usuário × módulo); gravação via upsert, já que a
+  linha pode não existir ainda para um módulo nunca concedido
+- Plano de Saúde entra como módulo com contagem de procedimentos e toggle de
+  envio de documentos (bucket `documentos_saude`); não tem toggle de IA, já
+  que esse app não tem funcionalidade de IA
+- Função `storage_usage_por_usuario()` generalizada para aceitar qualquer
+  bucket como parâmetro, servindo Controle Financeiro e Plano de Saúde
+- Conjunto inicial de funcionalidades administrativas planejadas
+  considerado completo — primeira versão v1.0.0
+
 ## v0.9.0 — 2026-07-27
 
 - Nova coluna "IA: Busca de Liga" no Banca Pro (terceiro tipo de uso de IA,

@@ -1,22 +1,48 @@
 // Worker do Painel Admin
 // Faz a ponte segura entre o admin.html (navegador) e a Admin API do Supabase.
-// A service role key de cada projeto NUNCA é enviada ao navegador — ela só
-// existe aqui, como secret configurado no Cloudflare.
+// A service role key do Hub NUNCA é enviada ao navegador — ela só existe
+// aqui, como secret configurado no Cloudflare.
+//
+// A partir da consolidação em projeto único (Hub), o painel não gerencia
+// mais "projetos" separados — gerencia MÓDULOS dentro do mesmo projeto
+// Supabase. Login e checagem de is_admin acontecem uma vez só, contra o
+// Hub; a escolha de módulo só filtra QUAIS dados aparecem na tabela.
 
-const PROJECTS = {
-  bancapro: {
-    url: "https://nccpmxavmwipsvzquzeg.supabase.co",
-    anonKey: "sb_publishable_XAjlhNGUMf9EzoqY4C3J9w_FJ1k-SxT",
-    recordsTable: "apostas",
+const HUB = {
+  url: "https://zlclakzjktpsbpfkltxa.supabase.co",
+  anonKey: "sb_publishable_o5Rn3Qp_C3boiYCRqQ5Ykw_2sNd3KiQ"
+};
+
+const MODULES = {
+  banca: {
+    label: "Banca Pro",
+    modulo: "banca",
+    recordsTable: "banca_apostas",
     recordsLabel: "Apostas",
-    hasDetailedAiCounts: true
+    hasAiToggle: true,
+    hasDetailedAiCounts: true,
+    aiUsageTable: "banca_ai_usage",
+    hasDocumentsToggle: false
   },
-  controlefinanceiro: {
-    url: "https://arkhifcucqozrpofhceq.supabase.co",
-    anonKey: "sb_publishable_fNGQLgpF3_tOycUEciaznw_b0o2FM8h",
-    recordsTable: "lancamentos",
+  financeiro: {
+    label: "Controle Financeiro",
+    modulo: "financeiro",
+    recordsTable: "financeiro_lancamentos",
     recordsLabel: "Lançamentos",
-    hasDocumentsToggle: true
+    hasAiToggle: true,
+    hasDetailedAiCounts: false,
+    hasDocumentsToggle: true,
+    bucket: "documentos"
+  },
+  saude: {
+    label: "Plano de Saúde",
+    modulo: "saude",
+    recordsTable: "saude_procedimentos",
+    recordsLabel: "Procedimentos",
+    hasAiToggle: false,
+    hasDetailedAiCounts: false,
+    hasDocumentsToggle: true,
+    bucket: "documentos_saude"
   }
 };
 
@@ -35,37 +61,21 @@ function jsonResponse(body, status) {
   });
 }
 
-function getServiceRoleKey(env, projectKey) {
-  if (projectKey === "bancapro") return env.SUPABASE_SERVICE_ROLE_BANCAPRO;
-  if (projectKey === "controlefinanceiro") return env.SUPABASE_SERVICE_ROLE_CONTROLEFINANCEIRO;
-  return null;
-}
-
-// Confere o token de acesso do usuário logado e se ele é admin no projeto pedido.
+// Confere o token de acesso do usuário logado e se ele é admin no Hub.
 // Retorna { ok: true, userId } ou { ok: false, status, message }
-// Projeto usado como "porta de entrada" única do painel: a autenticação e a
-// checagem de is_admin sempre acontecem aqui, não importa qual projeto o
-// admin queira gerenciar depois de logado.
-const ADMIN_PROJECT_KEY = "controlefinanceiro";
-
-// Confere o token de acesso do usuário logado e se ele é admin no projeto de
-// identidade (ADMIN_PROJECT_KEY). Retorna { ok: true, userId } ou
-// { ok: false, status, message }
 async function requireAdmin(accessToken, env) {
   if (!accessToken) {
     return { ok: false, status: 401, message: "Token de acesso ausente." };
   }
 
-  const adminProject = PROJECTS[ADMIN_PROJECT_KEY];
-  const serviceRoleKey = getServiceRoleKey(env, ADMIN_PROJECT_KEY);
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_HUB;
   if (!serviceRoleKey) {
-    return { ok: false, status: 500, message: "Projeto de identidade sem service role configurada." };
+    return { ok: false, status: 500, message: "Hub sem service role configurada." };
   }
 
-  // 1. Descobre quem é o usuário a partir do token dele (validação normal, não-admin)
-  const userResp = await fetch(adminProject.url + "/auth/v1/user", {
+  const userResp = await fetch(HUB.url + "/auth/v1/user", {
     headers: {
-      apikey: adminProject.anonKey,
+      apikey: HUB.anonKey,
       Authorization: "Bearer " + accessToken
     }
   });
@@ -77,9 +87,8 @@ async function requireAdmin(accessToken, env) {
   const userData = await userResp.json();
   const userId = userData.id;
 
-  // 2. Confere is_admin na tabela profiles do projeto de identidade
   const profileResp = await fetch(
-    adminProject.url + "/rest/v1/profiles?id=eq." + userId + "&select=is_admin",
+    HUB.url + "/rest/v1/profiles?id=eq." + userId + "&select=is_admin",
     {
       headers: {
         apikey: serviceRoleKey,
@@ -100,8 +109,8 @@ async function requireAdmin(accessToken, env) {
   return { ok: true, userId: userId };
 }
 
-async function listUsers(project, serviceRoleKey) {
-  const resp = await fetch(project.url + "/auth/v1/admin/users", {
+async function listUsers(mod, serviceRoleKey) {
+  const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
     headers: {
       apikey: serviceRoleKey,
       Authorization: "Bearer " + serviceRoleKey
@@ -116,27 +125,43 @@ async function listUsers(project, serviceRoleKey) {
   const data = await resp.json();
   const rawUsers = data.users || data || [];
 
-  const camposProfile = "id,ai_enabled,ai_calls_count"
-    + (project.hasDocumentsToggle ? ",documents_enabled" : "")
-    + (project.hasDetailedAiCounts ? ",ai_calls_bilhete,ai_calls_estatisticas,ai_calls_liga" : "");
-  const profilesResp = await fetch(project.url + "/rest/v1/profiles?select=" + camposProfile, {
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: "Bearer " + serviceRoleKey
+  // profiles_modulos: habilitado / ai_enabled / ai_calls_count / documents_enabled,
+  // filtrado pelo módulo atual.
+  const modResp = await fetch(
+    HUB.url + "/rest/v1/profiles_modulos?modulo=eq." + mod.modulo
+      + "&select=user_id,habilitado,ai_enabled,ai_calls_count,documents_enabled",
+    {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: "Bearer " + serviceRoleKey
+      }
     }
-  });
-  const profiles = profilesResp.ok ? await profilesResp.json() : [];
-  const profileById = {};
-  profiles.forEach(function (p) { profileById[p.id] = p; });
+  );
+  const modRows = modResp.ok ? await modResp.json() : [];
+  const modByUserId = {};
+  modRows.forEach(function (r) { modByUserId[r.user_id] = r; });
 
-  // Conta os registros (apostas/lançamentos) de cada usuário. Usa o header
-  // Prefer: count=exact junto com um select mínimo por usuário — simples e
-  // suficiente para o volume de usuários de um app pessoal.
+  // Subcontadores específicos de IA (hoje só o Banca Pro tem).
+  let aiUsageByUserId = {};
+  if (mod.hasDetailedAiCounts && mod.aiUsageTable) {
+    const aiResp = await fetch(HUB.url + "/rest/v1/" + mod.aiUsageTable + "?select=*", {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: "Bearer " + serviceRoleKey
+      }
+    });
+    if (aiResp.ok) {
+      const rows = await aiResp.json();
+      rows.forEach(function (r) { aiUsageByUserId[r.user_id] = r; });
+    }
+  }
+
+  // Conta os registros do módulo (apostas/lançamentos/procedimentos) por usuário.
   const recordCounts = {};
   await Promise.all(rawUsers.map(async function (u) {
     try {
       const countResp = await fetch(
-        project.url + "/rest/v1/" + project.recordsTable + "?user_id=eq." + u.id + "&select=id",
+        HUB.url + "/rest/v1/" + mod.recordsTable + "?user_id=eq." + u.id + "&select=id",
         {
           headers: {
             apikey: serviceRoleKey,
@@ -146,7 +171,7 @@ async function listUsers(project, serviceRoleKey) {
           }
         }
       );
-      const contentRange = countResp.headers.get("content-range"); // formato "0-0/123"
+      const contentRange = countResp.headers.get("content-range");
       const total = contentRange ? parseInt(contentRange.split("/")[1], 10) : null;
       recordCounts[u.id] = Number.isFinite(total) ? total : null;
     } catch (e) {
@@ -154,18 +179,18 @@ async function listUsers(project, serviceRoleKey) {
     }
   }));
 
-  // Uso de armazenamento por usuário (só em projetos com bucket de documentos).
+  // Uso de armazenamento por usuário (só em módulos com bucket de documentos).
   const storageByUserId = {};
-  if (project.hasDocumentsToggle) {
+  if (mod.hasDocumentsToggle && mod.bucket) {
     try {
-      const storageResp = await fetch(project.url + "/rest/v1/rpc/storage_usage_por_usuario", {
+      const storageResp = await fetch(HUB.url + "/rest/v1/rpc/storage_usage_por_usuario", {
         method: "POST",
         headers: {
           apikey: serviceRoleKey,
           Authorization: "Bearer " + serviceRoleKey,
           "Content-Type": "application/json"
         },
-        body: "{}"
+        body: JSON.stringify({ bucket_name: mod.bucket })
       });
       if (storageResp.ok) {
         const rows = await storageResp.json();
@@ -177,26 +202,28 @@ async function listUsers(project, serviceRoleKey) {
   }
 
   return rawUsers.map(function (u) {
-    const profile = profileById[u.id];
+    const mr = modByUserId[u.id];
+    const aiUsage = aiUsageByUserId[u.id];
     return {
       id: u.id,
       email: u.email,
       created_at: u.created_at,
       last_sign_in_at: u.last_sign_in_at,
-      ai_enabled: profile && profile.hasOwnProperty("ai_enabled") ? profile.ai_enabled : true,
-      ai_calls_count: profile && profile.hasOwnProperty("ai_calls_count") ? profile.ai_calls_count : 0,
-      ai_calls_bilhete: project.hasDetailedAiCounts ? (profile && profile.ai_calls_bilhete) || 0 : null,
-      ai_calls_estatisticas: project.hasDetailedAiCounts ? (profile && profile.ai_calls_estatisticas) || 0 : null,
-      ai_calls_liga: project.hasDetailedAiCounts ? (profile && profile.ai_calls_liga) || 0 : null,
-      documents_enabled: project.hasDocumentsToggle ? (profile && profile.hasOwnProperty("documents_enabled") ? profile.documents_enabled : true) : null,
-      storage_bytes: project.hasDocumentsToggle ? (storageByUserId.hasOwnProperty(u.id) ? Number(storageByUserId[u.id]) : 0) : null,
+      habilitado: mr ? mr.habilitado === true : false,
+      ai_enabled: mod.hasAiToggle ? (mr ? mr.ai_enabled === true : false) : null,
+      ai_calls_count: mod.hasAiToggle ? (mr && typeof mr.ai_calls_count === "number" ? mr.ai_calls_count : 0) : null,
+      ai_calls_bilhete: mod.hasDetailedAiCounts ? (aiUsage && aiUsage.ai_calls_bilhete) || 0 : null,
+      ai_calls_estatisticas: mod.hasDetailedAiCounts ? (aiUsage && aiUsage.ai_calls_estatisticas) || 0 : null,
+      ai_calls_liga: mod.hasDetailedAiCounts ? (aiUsage && aiUsage.ai_calls_liga) || 0 : null,
+      documents_enabled: mod.hasDocumentsToggle ? (mr ? mr.documents_enabled === true : false) : null,
+      storage_bytes: mod.hasDocumentsToggle ? (storageByUserId.hasOwnProperty(u.id) ? Number(storageByUserId[u.id]) : 0) : null,
       records_count: recordCounts[u.id]
     };
   });
 }
 
-async function deleteUser(project, serviceRoleKey, userId) {
-  const resp = await fetch(project.url + "/auth/v1/admin/users/" + userId, {
+async function deleteUser(serviceRoleKey, userId) {
+  const resp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
     method: "DELETE",
     headers: {
       apikey: serviceRoleKey,
@@ -210,8 +237,8 @@ async function deleteUser(project, serviceRoleKey, userId) {
   }
 }
 
-async function resetPassword(project, serviceRoleKey, userId, newPassword) {
-  const resp = await fetch(project.url + "/auth/v1/admin/users/" + userId, {
+async function resetPassword(serviceRoleKey, userId, newPassword) {
+  const resp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
     method: "PUT",
     headers: {
       apikey: serviceRoleKey,
@@ -227,39 +254,28 @@ async function resetPassword(project, serviceRoleKey, userId, newPassword) {
   }
 }
 
-async function setAiEnabled(project, serviceRoleKey, userId, aiEnabled) {
-  const resp = await fetch(project.url + "/rest/v1/profiles?id=eq." + userId, {
-    method: "PATCH",
+// Grava um campo em profiles_modulos via upsert (a linha pode ainda não
+// existir para esse usuário x módulo — ex: usuário novo que nunca teve
+// nenhum módulo concedido). merge-duplicates faz update parcial, sem
+// mexer nos outros campos da linha.
+async function upsertModuloField(serviceRoleKey, userId, modulo, campo, valor) {
+  const body = { user_id: userId, modulo: modulo };
+  body[campo] = valor;
+
+  const resp = await fetch(HUB.url + "/rest/v1/profiles_modulos?on_conflict=user_id,modulo", {
+    method: "POST",
     headers: {
       apikey: serviceRoleKey,
       Authorization: "Bearer " + serviceRoleKey,
       "Content-Type": "application/json",
-      Prefer: "return=minimal"
+      Prefer: "resolution=merge-duplicates,return=minimal"
     },
-    body: JSON.stringify({ ai_enabled: aiEnabled })
+    body: JSON.stringify(body)
   });
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error("Falha ao atualizar acesso à IA: " + text);
-  }
-}
-
-async function setDocumentsEnabled(project, serviceRoleKey, userId, documentsEnabled) {
-  const resp = await fetch(project.url + "/rest/v1/profiles?id=eq." + userId, {
-    method: "PATCH",
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: "Bearer " + serviceRoleKey,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal"
-    },
-    body: JSON.stringify({ documents_enabled: documentsEnabled })
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error("Falha ao atualizar acesso a documentos: " + text);
+    throw new Error("Falha ao atualizar " + campo + ": " + text);
   }
 }
 
@@ -271,19 +287,14 @@ export default {
       return new Response(null, { headers: corsHeaders() });
     }
 
-    // Serve o admin.html e demais arquivos estáticos para qualquer rota fora de /api/
     if (!url.pathname.startsWith("/api/")) {
       return env.ASSETS.fetch(request);
     }
 
     try {
       const body = request.method === "POST" ? await request.json() : {};
-      const projectKey = body.project;
-      const project = PROJECTS[projectKey];
-
-      if (!project) {
-        return jsonResponse({ error: "Projeto inválido." }, 400);
-      }
+      const moduleKey = body.module;
+      const mod = MODULES[moduleKey];
 
       const accessToken = body.accessToken;
       const auth = await requireAdmin(accessToken, env);
@@ -291,18 +302,39 @@ export default {
         return jsonResponse({ error: auth.message }, auth.status);
       }
 
-      const serviceRoleKey = getServiceRoleKey(env, projectKey);
+      const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_HUB;
 
       if (url.pathname === "/api/users" && request.method === "POST") {
-        const users = await listUsers(project, serviceRoleKey);
-        return jsonResponse({ users: users, recordsLabel: project.recordsLabel, hasDocumentsToggle: !!project.hasDocumentsToggle, hasDetailedAiCounts: !!project.hasDetailedAiCounts });
+        if (!mod) return jsonResponse({ error: "Módulo inválido." }, 400);
+        const users = await listUsers(mod, serviceRoleKey);
+        return jsonResponse({
+          users: users,
+          recordsLabel: mod.recordsLabel,
+          hasAiToggle: !!mod.hasAiToggle,
+          hasDocumentsToggle: !!mod.hasDocumentsToggle,
+          hasDetailedAiCounts: !!mod.hasDetailedAiCounts
+        });
+      }
+
+      if (url.pathname === "/api/users/set-module-access" && request.method === "POST") {
+        if (!mod) return jsonResponse({ error: "Módulo inválido." }, 400);
+        await upsertModuloField(serviceRoleKey, body.userId, mod.modulo, "habilitado", body.habilitado === true);
+        return jsonResponse({ ok: true });
+      }
+
+      if (url.pathname === "/api/users/set-ai-access" && request.method === "POST") {
+        if (!mod || !mod.hasAiToggle) {
+          return jsonResponse({ error: "Este módulo não tem controle de acesso à IA." }, 400);
+        }
+        await upsertModuloField(serviceRoleKey, body.userId, mod.modulo, "ai_enabled", body.aiEnabled === true);
+        return jsonResponse({ ok: true });
       }
 
       if (url.pathname === "/api/users/set-documents-access" && request.method === "POST") {
-        if (!project.hasDocumentsToggle) {
-          return jsonResponse({ error: "Este projeto não tem controle de envio de documentos." }, 400);
+        if (!mod || !mod.hasDocumentsToggle) {
+          return jsonResponse({ error: "Este módulo não tem controle de envio de documentos." }, 400);
         }
-        await setDocumentsEnabled(project, serviceRoleKey, body.userId, body.documentsEnabled === true);
+        await upsertModuloField(serviceRoleKey, body.userId, mod.modulo, "documents_enabled", body.documentsEnabled === true);
         return jsonResponse({ ok: true });
       }
 
@@ -310,7 +342,7 @@ export default {
         if (body.userId === auth.userId) {
           return jsonResponse({ error: "Você não pode remover a si mesmo por aqui." }, 400);
         }
-        await deleteUser(project, serviceRoleKey, body.userId);
+        await deleteUser(serviceRoleKey, body.userId);
         return jsonResponse({ ok: true });
       }
 
@@ -319,12 +351,7 @@ export default {
         if (!newPassword || newPassword.length < 8) {
           return jsonResponse({ error: "A nova senha precisa ter ao menos 8 caracteres." }, 400);
         }
-        await resetPassword(project, serviceRoleKey, body.userId, newPassword);
-        return jsonResponse({ ok: true });
-      }
-
-      if (url.pathname === "/api/users/set-ai-access" && request.method === "POST") {
-        await setAiEnabled(project, serviceRoleKey, body.userId, body.aiEnabled === true);
+        await resetPassword(serviceRoleKey, body.userId, newPassword);
         return jsonResponse({ ok: true });
       }
 

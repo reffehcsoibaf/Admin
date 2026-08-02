@@ -325,15 +325,19 @@
       </form>
     </section>
 
-    <!-- Etapa 2: escolha do projeto a gerenciar -->
-    <section id="step-project" class="hidden project-choice" aria-label="Escolha do projeto">
-      <button type="button" class="project-btn" data-project="bancapro">
+    <!-- Etapa 2: escolha do módulo a gerenciar -->
+    <section id="step-project" class="hidden project-choice" aria-label="Escolha do módulo">
+      <button type="button" class="project-btn" data-project="banca">
         <strong>Banca Pro</strong>
         <span>Controle de apostas esportivas</span>
       </button>
-      <button type="button" class="project-btn" data-project="controlefinanceiro">
+      <button type="button" class="project-btn" data-project="financeiro">
         <strong>Controle Financeiro</strong>
         <span>Gestão financeira pessoal</span>
+      </button>
+      <button type="button" class="project-btn" data-project="saude">
+        <strong>Plano de Saúde</strong>
+        <span>Procedimentos, agenda e reembolsos</span>
       </button>
       <button type="button" class="link-btn" id="logout-from-project">Sair da conta</button>
     </section>
@@ -346,43 +350,33 @@
       <div id="users-container">
         <p class="users-empty" id="users-loading">Carregando usuários...</p>
       </div>
-      <button type="button" class="link-btn" id="back-to-project">← Trocar de projeto</button>
+      <button type="button" class="link-btn" id="back-to-project">← Trocar de módulo</button>
       <button type="button" class="link-btn" id="logout-btn">Sair da conta</button>
     </section>
 
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v0.9.0</footer>
+  <footer class="version-footer">Painel Admin v1.0.0</footer>
 </main>
 
 <script>
 (function () {
   "use strict";
 
-  // Configuração dos projetos Supabase
-  const PROJECTS = {
-    bancapro: {
-      label: "Banca Pro",
-      url: "https://nccpmxavmwipsvzquzeg.supabase.co",
-      anonKey: "sb_publishable_XAjlhNGUMf9EzoqY4C3J9w_FJ1k-SxT"
-    },
-    controlefinanceiro: {
-      label: "Controle Financeiro",
-      url: "https://arkhifcucqozrpofhceq.supabase.co",
-      anonKey: "sb_publishable_fNGQLgpF3_tOycUEciaznw_b0o2FM8h"
-    }
+  // Projeto único: o Hub. Login e checagem de admin acontecem sempre aqui;
+  // a escolha de módulo só decide qual conjunto de dados aparece na tabela.
+  const HUB = {
+    url: "https://zlclakzjktpsbpfkltxa.supabase.co",
+    anonKey: "sb_publishable_o5Rn3Qp_C3boiYCRqQ5Ykw_2sNd3KiQ"
   };
 
-  // Projeto usado como porta de entrada única (login + checagem de admin).
-  // Precisa bater com ADMIN_PROJECT_KEY no worker.js.
-  const ADMIN_PROJECT_KEY = "controlefinanceiro";
-
   let supabaseClient = null;
-  let currentProjectKey = null;
+  let currentModuleKey = null;
   let currentAccessToken = null;
   let currentUserEmail = null;
   let currentRecordsLabel = "Registros";
+  let currentHasAiToggle = false;
   let currentHasDocumentsToggle = false;
   let currentHasDetailedAiCounts = false;
 
@@ -424,17 +418,21 @@
       return false;
     }
     if (!supabaseClient) {
-      const adminProject = PROJECTS[ADMIN_PROJECT_KEY];
-      supabaseClient = window.supabase.createClient(adminProject.url, adminProject.anonKey);
+      supabaseClient = window.supabase.createClient(HUB.url, HUB.anonKey);
     }
     return true;
   }
   iniciarClienteSupabase();
 
-  function selecionarProjetoParaGerenciar(key) {
-    currentProjectKey = key;
-    const project = PROJECTS[key];
-    panelMeta.textContent = project.label + " — conectado como " + currentUserEmail;
+  const MODULE_LABELS = {
+    banca: "Banca Pro",
+    financeiro: "Controle Financeiro",
+    saude: "Plano de Saúde"
+  };
+
+  function selecionarModuloParaGerenciar(key) {
+    currentModuleKey = key;
+    panelMeta.textContent = (MODULE_LABELS[key] || key) + " — conectado como " + currentUserEmail;
     setAlert(panelAlert, "", null);
     showStep(stepPanel);
     loadUsers();
@@ -442,12 +440,12 @@
 
   document.querySelectorAll(".project-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
-      selecionarProjetoParaGerenciar(btn.getAttribute("data-project"));
+      selecionarModuloParaGerenciar(btn.getAttribute("data-project"));
     });
   });
 
   backToProject.addEventListener("click", function () {
-    subtitle.textContent = "Escolha o projeto que deseja gerenciar.";
+    subtitle.textContent = "Escolha o módulo que deseja gerenciar.";
     showStep(stepProject);
   });
 
@@ -500,7 +498,7 @@
 
       currentAccessToken = authData.session.access_token;
       currentUserEmail = email;
-      subtitle.textContent = "Escolha o projeto que deseja gerenciar.";
+      subtitle.textContent = "Escolha o módulo que deseja gerenciar.";
       showStep(stepProject);
       statusLine.textContent = "";
     } catch (err) {
@@ -517,7 +515,7 @@
     }
     currentAccessToken = null;
     currentUserEmail = null;
-    currentProjectKey = null;
+    currentModuleKey = null;
     loginForm.reset();
     setAlert(loginAlert, "", null);
     subtitle.textContent = "Entre com sua conta de administrador.";
@@ -555,7 +553,7 @@
       const resp = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken })
+        body: JSON.stringify({ module: currentModuleKey, accessToken: currentAccessToken })
       });
       const data = await resp.json();
 
@@ -566,6 +564,7 @@
       }
 
       currentRecordsLabel = data.recordsLabel || "Registros";
+      currentHasAiToggle = !!data.hasAiToggle;
       currentHasDocumentsToggle = !!data.hasDocumentsToggle;
       currentHasDetailedAiCounts = !!data.hasDetailedAiCounts;
       renderUsers(data.users);
@@ -577,7 +576,7 @@
 
   function renderUsers(users) {
     if (!users.length) {
-      usersContainer.innerHTML = '<p class="users-empty">Nenhum usuário cadastrado neste projeto.</p>';
+      usersContainer.innerHTML = '<p class="users-empty">Nenhum usuário cadastrado.</p>';
       return;
     }
 
@@ -585,16 +584,20 @@
       "<th scope=\"col\">E-mail</th>" +
       "<th scope=\"col\">Cadastrado em</th>" +
       "<th scope=\"col\">Último login</th>" +
-      "<th scope=\"col\">Acesso à IA</th>" +
-      (currentHasDetailedAiCounts ?
-        "<th scope=\"col\">IA: Bilhetes</th><th scope=\"col\">IA: Estatísticas</th><th scope=\"col\">IA: Busca de Liga</th>"
-        : "<th scope=\"col\">Usos de IA</th>") +
+      "<th scope=\"col\">Módulo habilitado</th>" +
+      (currentHasAiToggle ?
+        "<th scope=\"col\">Acesso à IA</th>" +
+        (currentHasDetailedAiCounts ?
+          "<th scope=\"col\">IA: Bilhetes</th><th scope=\"col\">IA: Estatísticas</th><th scope=\"col\">IA: Busca de Liga</th>"
+          : "<th scope=\"col\">Usos de IA</th>")
+        : "") +
       (currentHasDocumentsToggle ? "<th scope=\"col\">Envio de Documentos</th><th scope=\"col\">Armazenamento</th>" : "") +
       "<th scope=\"col\">" + escapeHtml(currentRecordsLabel) + "</th>" +
       "<th scope=\"col\">Ação</th>" +
       "</tr></thead><tbody>";
 
     users.forEach(function (u) {
+      const moduleCheckboxId = "mod-toggle-" + u.id;
       const checkboxId = "ai-toggle-" + u.id;
       const docCheckboxId = "doc-toggle-" + u.id;
       html += "<tr>" +
@@ -602,15 +605,22 @@
         "<td>" + formatDate(u.created_at) + "</td>" +
         "<td>" + formatDate(u.last_sign_in_at) + "</td>" +
         "<td>" +
-        "<label class=\"ai-toggle-label\" for=\"" + checkboxId + "\">" +
-        "<input type=\"checkbox\" id=\"" + checkboxId + "\" class=\"ai-toggle\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\"" + (u.ai_enabled ? " checked" : "") + ">" +
-        "Ativado</label>" +
+        "<label class=\"ai-toggle-label\" for=\"" + moduleCheckboxId + "\">" +
+        "<input type=\"checkbox\" id=\"" + moduleCheckboxId + "\" class=\"module-toggle\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\"" + (u.habilitado ? " checked" : "") + ">" +
+        "Habilitado</label>" +
         "</td>" +
-        (currentHasDetailedAiCounts ?
-          "<td>" + (typeof u.ai_calls_bilhete === "number" ? u.ai_calls_bilhete : "—") + "</td>" +
-          "<td>" + (typeof u.ai_calls_estatisticas === "number" ? u.ai_calls_estatisticas : "—") + "</td>" +
-          "<td>" + (typeof u.ai_calls_liga === "number" ? u.ai_calls_liga : "—") + "</td>"
-          : "<td>" + (typeof u.ai_calls_count === "number" ? u.ai_calls_count : "—") + "</td>") +
+        (currentHasAiToggle ?
+          "<td>" +
+          "<label class=\"ai-toggle-label\" for=\"" + checkboxId + "\">" +
+          "<input type=\"checkbox\" id=\"" + checkboxId + "\" class=\"ai-toggle\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\"" + (u.ai_enabled ? " checked" : "") + ">" +
+          "Ativado</label>" +
+          "</td>" +
+          (currentHasDetailedAiCounts ?
+            "<td>" + (typeof u.ai_calls_bilhete === "number" ? u.ai_calls_bilhete : "—") + "</td>" +
+            "<td>" + (typeof u.ai_calls_estatisticas === "number" ? u.ai_calls_estatisticas : "—") + "</td>" +
+            "<td>" + (typeof u.ai_calls_liga === "number" ? u.ai_calls_liga : "—") + "</td>"
+            : "<td>" + (typeof u.ai_calls_count === "number" ? u.ai_calls_count : "—") + "</td>")
+          : "") +
         (currentHasDocumentsToggle ?
           "<td>" +
           "<label class=\"ai-toggle-label\" for=\"" + docCheckboxId + "\">" +
@@ -642,6 +652,12 @@
       });
     });
 
+    usersContainer.querySelectorAll(".module-toggle").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        handleToggleModuleAccess(checkbox.getAttribute("data-user-id"), checkbox.getAttribute("data-user-email"), checkbox);
+      });
+    });
+
     usersContainer.querySelectorAll(".ai-toggle").forEach(function (checkbox) {
       checkbox.addEventListener("change", function () {
         handleToggleAiAccess(checkbox.getAttribute("data-user-id"), checkbox.getAttribute("data-user-email"), checkbox);
@@ -655,6 +671,34 @@
     });
   }
 
+  async function handleToggleModuleAccess(userId, email, checkbox) {
+    const novoValor = checkbox.checked;
+    checkbox.disabled = true;
+    setAlert(panelAlert, "", null);
+
+    try {
+      const resp = await fetch("/api/users/set-module-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module: currentModuleKey, accessToken: currentAccessToken, userId: userId, habilitado: novoValor })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        checkbox.checked = !novoValor;
+        setAlert(panelAlert, data.error || "Erro ao atualizar acesso ao módulo.", "error");
+        return;
+      }
+
+      setAlert(panelAlert, "Módulo " + (novoValor ? "habilitado" : "desabilitado") + " para " + email + ".", "ok");
+    } catch (err) {
+      checkbox.checked = !novoValor;
+      setAlert(panelAlert, "Erro ao atualizar acesso ao módulo: " + err.message, "error");
+    } finally {
+      checkbox.disabled = false;
+    }
+  }
+
   async function handleToggleAiAccess(userId, email, checkbox) {
     const novoValor = checkbox.checked;
     checkbox.disabled = true;
@@ -664,7 +708,7 @@
       const resp = await fetch("/api/users/set-ai-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId, aiEnabled: novoValor })
+        body: JSON.stringify({ module: currentModuleKey, accessToken: currentAccessToken, userId: userId, aiEnabled: novoValor })
       });
       const data = await resp.json();
 
@@ -692,7 +736,7 @@
       const resp = await fetch("/api/users/set-documents-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId, documentsEnabled: novoValor })
+        body: JSON.stringify({ module: currentModuleKey, accessToken: currentAccessToken, userId: userId, documentsEnabled: novoValor })
       });
       const data = await resp.json();
 
@@ -736,7 +780,7 @@
       const resp = await fetch("/api/users/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId, newPassword: newPassword })
+        body: JSON.stringify({ accessToken: currentAccessToken, userId: userId, newPassword: newPassword })
       });
       const data = await resp.json();
 
@@ -773,7 +817,7 @@
       const resp = await fetch("/api/users/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project: currentProjectKey, accessToken: currentAccessToken, userId: userId })
+        body: JSON.stringify({ accessToken: currentAccessToken, userId: userId })
       });
       const data = await resp.json();
 
