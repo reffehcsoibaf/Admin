@@ -4,6 +4,26 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.3.0 — 2026-08-04
+
+- "Criar novo usuário" e "Permitir autocadastro" movidos da tela de um
+  módulo específico para a tela de escolha de módulo — já que são
+  funcionalidades do Hub inteiro, não de um módulo isolado, ficam visíveis
+  uma vez só, antes de escolher o que gerenciar
+
+## v1.2.0 — 2026-08-04
+
+- Toggle global "Permitir que qualquer pessoa se cadastre", via Management
+  API do Supabase (`disable_signup`); vale para o Hub inteiro, não varia por
+  módulo
+- Nova variável de ambiente exigida no Worker: `SUPABASE_MANAGEMENT_TOKEN`
+  (token de acesso pessoal do Supabase, configurado como Secret)
+- Avaliado e descartado: toggle isolado de "recuperação de senha por
+  e-mail" — o Supabase não oferece esse controle separado (só é possível
+  desligar e-mail de autenticação por completo, o que bloquearia
+  confirmação de cadastro e magic link junto); o botão "Redefinir senha"
+  já existente no painel cobre essa necessidade sem depender de e-mail
+
 ## v1.1.0 — 2026-08-04
 
 - Criação de novo usuário direto pelo painel (e-mail + senha inicial), via

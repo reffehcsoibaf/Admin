@@ -327,6 +327,34 @@
 
     <!-- Etapa 2: escolha do módulo a gerenciar -->
     <section id="step-project" class="hidden project-choice" aria-label="Escolha do módulo">
+      <div id="project-alert"></div>
+
+      <div id="bloco-autocadastro" style="margin-bottom:20px;padding:12px;border:1px solid var(--border);border-radius:8px;">
+        <label class="ai-toggle-label" for="toggle-autocadastro" style="font-weight:600;">
+          <input type="checkbox" id="toggle-autocadastro">
+          Permitir que qualquer pessoa se cadastre nos apps
+        </label>
+        <p style="color:var(--text-dim);font-size:0.85rem;margin:6px 0 0 0;">
+          Configuração única, vale para o Hub inteiro (não muda por módulo). Se desativado, só você consegue criar usuários — pelo botão "Criar novo usuário" abaixo.
+        </p>
+      </div>
+
+      <details id="bloco-criar-usuario" style="margin-bottom:20px;">
+        <summary style="cursor:pointer;font-weight:600;padding:8px 0;">+ Criar novo usuário</summary>
+        <form id="form-criar-usuario" style="margin-top:12px;">
+          <div class="field">
+            <label for="novo-usuario-email">E-mail do novo usuário</label>
+            <input type="email" id="novo-usuario-email" required>
+          </div>
+          <div class="field">
+            <label for="novo-usuario-senha">Senha inicial</label>
+            <input type="password" id="novo-usuario-senha" minlength="8" required>
+          </div>
+          <button type="submit" class="primary-btn" id="criar-usuario-submit">Criar usuário</button>
+        </form>
+      </details>
+
+      <p style="font-weight:600;margin-bottom:8px;">Escolha o módulo para gerenciar usuários:</p>
       <button type="button" class="project-btn" data-project="banca">
         <strong>Banca Pro</strong>
         <span>Controle de apostas esportivas</span>
@@ -348,21 +376,6 @@
       <p class="meta" id="panel-meta"></p>
       <div id="panel-alert"></div>
 
-      <details id="bloco-criar-usuario" style="margin-bottom:20px;">
-        <summary style="cursor:pointer;font-weight:600;padding:8px 0;">+ Criar novo usuário</summary>
-        <form id="form-criar-usuario" style="margin-top:12px;">
-          <div class="field">
-            <label for="novo-usuario-email">E-mail do novo usuário</label>
-            <input type="email" id="novo-usuario-email" required>
-          </div>
-          <div class="field">
-            <label for="novo-usuario-senha">Senha inicial</label>
-            <input type="password" id="novo-usuario-senha" minlength="8" required>
-          </div>
-          <button type="submit" class="primary-btn" id="criar-usuario-submit">Criar usuário</button>
-        </form>
-      </details>
-
       <div id="users-container">
         <p class="users-empty" id="users-loading">Carregando usuários...</p>
       </div>
@@ -373,7 +386,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v1.1.0</footer>
+  <footer class="version-footer">Painel Admin v1.3.0</footer>
 </main>
 
 <script>
@@ -408,6 +421,7 @@
   const logoutFromProject = document.getElementById("logout-from-project");
   const panelMeta = document.getElementById("panel-meta");
   const panelAlert = document.getElementById("panel-alert");
+  const projectAlert = document.getElementById("project-alert");
   const formCriarUsuario = document.getElementById("form-criar-usuario");
   const criarUsuarioSubmit = document.getElementById("criar-usuario-submit");
   const usersContainer = document.getElementById("users-container");
@@ -456,6 +470,52 @@
     loadUsers();
   }
 
+  const toggleAutocadastro = document.getElementById("toggle-autocadastro");
+
+  async function carregarConfigAutocadastro() {
+    toggleAutocadastro.disabled = true;
+    try {
+      const resp = await fetch("/api/auth-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        toggleAutocadastro.checked = data.allowSignup === true;
+      }
+    } catch (e) {
+      // se falhar, deixa o toggle como está, sem travar o resto do painel
+    } finally {
+      toggleAutocadastro.disabled = false;
+    }
+  }
+
+  toggleAutocadastro.addEventListener("change", async function () {
+    const novoValor = toggleAutocadastro.checked;
+    toggleAutocadastro.disabled = true;
+    setAlert(projectAlert, "", null);
+    try {
+      const resp = await fetch("/api/auth-config/set-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken, allowSignup: novoValor })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        toggleAutocadastro.checked = !novoValor;
+        setAlert(projectAlert, data.error || "Erro ao atualizar configuração de autocadastro.", "error");
+        return;
+      }
+      setAlert(projectAlert, "Autocadastro " + (novoValor ? "permitido" : "bloqueado") + " para todos os apps.", "ok");
+    } catch (err) {
+      toggleAutocadastro.checked = !novoValor;
+      setAlert(projectAlert, "Erro ao atualizar configuração de autocadastro: " + err.message, "error");
+    } finally {
+      toggleAutocadastro.disabled = false;
+    }
+  });
+
   document.querySelectorAll(".project-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
       selecionarModuloParaGerenciar(btn.getAttribute("data-project"));
@@ -465,6 +525,7 @@
   backToProject.addEventListener("click", function () {
     subtitle.textContent = "Escolha o módulo que deseja gerenciar.";
     showStep(stepProject);
+    carregarConfigAutocadastro();
   });
 
   loginForm.addEventListener("submit", async function (e) {
@@ -518,6 +579,7 @@
       currentUserEmail = email;
       subtitle.textContent = "Escolha o módulo que deseja gerenciar.";
       showStep(stepProject);
+      carregarConfigAutocadastro();
       statusLine.textContent = "";
     } catch (err) {
       setAlert(loginAlert, "Erro inesperado: " + err.message, "error");
@@ -565,7 +627,7 @@
 
   formCriarUsuario.addEventListener("submit", async function (e) {
     e.preventDefault();
-    setAlert(panelAlert, "", null);
+    setAlert(projectAlert, "", null);
     criarUsuarioSubmit.disabled = true;
     criarUsuarioSubmit.textContent = "Criando...";
 
@@ -581,16 +643,15 @@
       const data = await resp.json();
 
       if (!resp.ok) {
-        setAlert(panelAlert, data.error || "Erro ao criar usuário.", "error");
+        setAlert(projectAlert, data.error || "Erro ao criar usuário.", "error");
         return;
       }
 
-      setAlert(panelAlert, "Usuário " + email + " criado com sucesso. Ele ainda não tem acesso a nenhum módulo — ative pelo toggle \"Módulo habilitado\" quando quiser liberar.", "ok");
+      setAlert(projectAlert, "Usuário " + email + " criado com sucesso. Ele ainda não tem acesso a nenhum módulo — escolha um módulo abaixo e ative pelo toggle \"Módulo habilitado\" quando quiser liberar.", "ok");
       formCriarUsuario.reset();
       document.getElementById("bloco-criar-usuario").removeAttribute("open");
-      loadUsers();
     } catch (err) {
-      setAlert(panelAlert, "Erro ao criar usuário: " + err.message, "error");
+      setAlert(projectAlert, "Erro ao criar usuário: " + err.message, "error");
     } finally {
       criarUsuarioSubmit.disabled = false;
       criarUsuarioSubmit.textContent = "Criar usuário";

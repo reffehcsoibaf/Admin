@@ -222,6 +222,37 @@ async function listUsers(mod, serviceRoleKey) {
   });
 }
 
+const HUB_PROJECT_REF = "zlclakzjktpsbpfkltxa"; // extraído da HUB.url
+
+// Consulta se o autocadastro está permitido hoje (Management API).
+async function getSignupConfig(env) {
+  const resp = await fetch("https://api.supabase.com/v1/projects/" + HUB_PROJECT_REF + "/config/auth", {
+    headers: { Authorization: "Bearer " + env.SUPABASE_MANAGEMENT_TOKEN }
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao consultar configuração de autocadastro: " + text);
+  }
+  const data = await resp.json();
+  return { allowSignup: data.disable_signup !== true };
+}
+
+// Liga/desliga o autocadastro (qualquer pessoa se cadastrar sozinha nos apps).
+async function setSignupConfig(env, allowSignup) {
+  const resp = await fetch("https://api.supabase.com/v1/projects/" + HUB_PROJECT_REF + "/config/auth", {
+    method: "PATCH",
+    headers: {
+      Authorization: "Bearer " + env.SUPABASE_MANAGEMENT_TOKEN,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ disable_signup: !allowSignup })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao atualizar configuração de autocadastro: " + text);
+  }
+}
+
 async function createUser(serviceRoleKey, email, password) {
   const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
     method: "POST",
@@ -332,6 +363,16 @@ export default {
           hasDocumentsToggle: !!mod.hasDocumentsToggle,
           hasDetailedAiCounts: !!mod.hasDetailedAiCounts
         });
+      }
+
+      if (url.pathname === "/api/auth-config" && request.method === "POST") {
+        const config = await getSignupConfig(env);
+        return jsonResponse(config);
+      }
+
+      if (url.pathname === "/api/auth-config/set-signup" && request.method === "POST") {
+        await setSignupConfig(env, body.allowSignup === true);
+        return jsonResponse({ ok: true });
       }
 
       if (url.pathname === "/api/users/create" && request.method === "POST") {
