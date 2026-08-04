@@ -222,6 +222,24 @@ async function listUsers(mod, serviceRoleKey) {
   });
 }
 
+async function createUser(serviceRoleKey, email, password) {
+  const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ email: email, password: password, email_confirm: true })
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao criar usuário: " + text);
+  }
+  return await resp.json();
+}
+
 async function deleteUser(serviceRoleKey, userId) {
   const resp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
     method: "DELETE",
@@ -314,6 +332,16 @@ export default {
           hasDocumentsToggle: !!mod.hasDocumentsToggle,
           hasDetailedAiCounts: !!mod.hasDetailedAiCounts
         });
+      }
+
+      if (url.pathname === "/api/users/create" && request.method === "POST") {
+        const email = (body.email || "").trim();
+        const password = body.password;
+        if (!email || !password || password.length < 8) {
+          return jsonResponse({ error: "Informe um e-mail válido e uma senha com ao menos 8 caracteres." }, 400);
+        }
+        const novoUsuario = await createUser(serviceRoleKey, email, password);
+        return jsonResponse({ ok: true, user: { id: novoUsuario.id, email: novoUsuario.email } });
       }
 
       if (url.pathname === "/api/users/set-module-access" && request.method === "POST") {

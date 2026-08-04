@@ -347,6 +347,22 @@
       <h2>Usuários</h2>
       <p class="meta" id="panel-meta"></p>
       <div id="panel-alert"></div>
+
+      <details id="bloco-criar-usuario" style="margin-bottom:20px;">
+        <summary style="cursor:pointer;font-weight:600;padding:8px 0;">+ Criar novo usuário</summary>
+        <form id="form-criar-usuario" style="margin-top:12px;">
+          <div class="field">
+            <label for="novo-usuario-email">E-mail do novo usuário</label>
+            <input type="email" id="novo-usuario-email" required>
+          </div>
+          <div class="field">
+            <label for="novo-usuario-senha">Senha inicial</label>
+            <input type="password" id="novo-usuario-senha" minlength="8" required>
+          </div>
+          <button type="submit" class="primary-btn" id="criar-usuario-submit">Criar usuário</button>
+        </form>
+      </details>
+
       <div id="users-container">
         <p class="users-empty" id="users-loading">Carregando usuários...</p>
       </div>
@@ -357,7 +373,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v1.0.0</footer>
+  <footer class="version-footer">Painel Admin v1.1.0</footer>
 </main>
 
 <script>
@@ -392,6 +408,8 @@
   const logoutFromProject = document.getElementById("logout-from-project");
   const panelMeta = document.getElementById("panel-meta");
   const panelAlert = document.getElementById("panel-alert");
+  const formCriarUsuario = document.getElementById("form-criar-usuario");
+  const criarUsuarioSubmit = document.getElementById("criar-usuario-submit");
   const usersContainer = document.getElementById("users-container");
   const statusLine = document.getElementById("status-line");
 
@@ -544,6 +562,40 @@
     const mb = bytes / (1024 * 1024);
     return mb < 0.1 ? "< 0.1 MB" : mb.toFixed(1) + " MB";
   }
+
+  formCriarUsuario.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    setAlert(panelAlert, "", null);
+    criarUsuarioSubmit.disabled = true;
+    criarUsuarioSubmit.textContent = "Criando...";
+
+    const email = document.getElementById("novo-usuario-email").value.trim();
+    const senha = document.getElementById("novo-usuario-senha").value;
+
+    try {
+      const resp = await fetch("/api/users/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken, email: email, password: senha })
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setAlert(panelAlert, data.error || "Erro ao criar usuário.", "error");
+        return;
+      }
+
+      setAlert(panelAlert, "Usuário " + email + " criado com sucesso. Ele ainda não tem acesso a nenhum módulo — ative pelo toggle \"Módulo habilitado\" quando quiser liberar.", "ok");
+      formCriarUsuario.reset();
+      document.getElementById("bloco-criar-usuario").removeAttribute("open");
+      loadUsers();
+    } catch (err) {
+      setAlert(panelAlert, "Erro ao criar usuário: " + err.message, "error");
+    } finally {
+      criarUsuarioSubmit.disabled = false;
+      criarUsuarioSubmit.textContent = "Criar usuário";
+    }
+  });
 
   async function loadUsers() {
     setAlert(panelAlert, "", null);

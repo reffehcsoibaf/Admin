@@ -4,6 +4,14 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.1.0 — 2026-08-04
+
+- Criação de novo usuário direto pelo painel (e-mail + senha inicial), via
+  Admin API do Supabase (nível do Hub, não depende do módulo selecionado)
+- Usuário criado assim nasce sem nenhum módulo habilitado — precisa ser
+  liberado manualmente pelo toggle "Módulo habilitado" em cada módulo
+  desejado
+
 ## v1.0.0 — 2026-08-02
 
 - Reforma completa para o modelo de projeto único (Hub): Banca Pro, Controle
