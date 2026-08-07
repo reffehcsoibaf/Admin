@@ -275,6 +275,44 @@ async function getUsoTotalProjeto(serviceRoleKey) {
   };
 }
 
+// Traz o estado de um único usuário em TODOS os módulos de uma vez, para a
+// tela de "gerenciar usuário" (evita ter que trocar de módulo no painel só
+// para ativar/desativar algo).
+async function getUserDetail(serviceRoleKey, userId) {
+  const userResp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
+    headers: { apikey: serviceRoleKey, Authorization: "Bearer " + serviceRoleKey }
+  });
+  if (!userResp.ok) {
+    const text = await userResp.text();
+    throw new Error("Falha ao buscar usuário: " + text);
+  }
+  const userData = await userResp.json();
+
+  const modResp = await fetch(
+    HUB.url + "/rest/v1/profiles_modulos?user_id=eq." + userId + "&select=modulo,habilitado,ai_enabled,documents_enabled",
+    { headers: { apikey: serviceRoleKey, Authorization: "Bearer " + serviceRoleKey } }
+  );
+  const modRows = modResp.ok ? await modResp.json() : [];
+  const modByKey = {};
+  modRows.forEach(function (r) { modByKey[r.modulo] = r; });
+
+  const modules = Object.keys(MODULES).map(function (key) {
+    const mod = MODULES[key];
+    const mr = modByKey[mod.modulo];
+    return {
+      key: key,
+      label: mod.label,
+      habilitado: mr ? mr.habilitado === true : false,
+      hasAiToggle: !!mod.hasAiToggle,
+      ai_enabled: mod.hasAiToggle ? (mr ? mr.ai_enabled === true : false) : null,
+      hasDocumentsToggle: !!mod.hasDocumentsToggle,
+      documents_enabled: mod.hasDocumentsToggle ? (mr ? mr.documents_enabled === true : false) : null
+    };
+  });
+
+  return { id: userId, email: userData.email, modules: modules };
+}
+
 async function createUser(serviceRoleKey, email, password) {
   const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
     method: "POST",
@@ -410,6 +448,11 @@ export default {
         }
         const novoUsuario = await createUser(serviceRoleKey, email, password);
         return jsonResponse({ ok: true, user: { id: novoUsuario.id, email: novoUsuario.email } });
+      }
+
+      if (url.pathname === "/api/users/detail" && request.method === "POST") {
+        const detail = await getUserDetail(serviceRoleKey, body.userId);
+        return jsonResponse(detail);
       }
 
       if (url.pathname === "/api/users/set-module-access" && request.method === "POST") {

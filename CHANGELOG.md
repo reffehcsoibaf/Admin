@@ -4,6 +4,16 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.5.0 — 2026-08-04
+
+- Campo de busca por e-mail (ou parte dele) na lista de usuários de cada
+  módulo, filtragem no navegador sem nova consulta ao servidor
+- Nova tela "Gerenciar usuário", acessível pelo botão "Gerenciar em todos
+  os módulos" em qualquer linha da lista: mostra e permite alternar
+  Módulo habilitado / Acesso à IA / Envio de Documentos dos três módulos
+  (Banca Pro, Controle Financeiro, Plano de Saúde) de uma vez, sem
+  precisar trocar de módulo no painel para cada ajuste
+
 ## v1.4.0 — 2026-08-04
 
 - Bloco de "uso do projeto" na tela de escolha de módulo: mostra MB usados

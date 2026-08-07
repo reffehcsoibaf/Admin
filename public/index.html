@@ -380,6 +380,11 @@
       <p class="meta" id="panel-meta"></p>
       <div id="panel-alert"></div>
 
+      <div class="field">
+        <label for="busca-usuario">Buscar por e-mail</label>
+        <input type="search" id="busca-usuario" placeholder="Digite parte do e-mail...">
+      </div>
+
       <div id="users-container">
         <p class="users-empty" id="users-loading">Carregando usuários...</p>
       </div>
@@ -387,10 +392,21 @@
       <button type="button" class="link-btn" id="logout-btn">Sair da conta</button>
     </section>
 
+    <!-- Etapa 4: gerenciar um usuário em todos os módulos -->
+    <section id="step-user-detail" class="hidden welcome" aria-label="Gerenciar usuário">
+      <h2>Gerenciar usuário</h2>
+      <p class="meta" id="detail-user-email"></p>
+      <div id="detail-alert"></div>
+      <div id="detail-modules-container">
+        <p class="users-empty">Carregando módulos...</p>
+      </div>
+      <button type="button" class="link-btn" id="back-to-users">← Voltar para a lista</button>
+    </section>
+
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v1.4.0</footer>
+  <footer class="version-footer">Painel Admin v1.5.0</footer>
 </main>
 
 <script>
@@ -412,10 +428,12 @@
   let currentHasAiToggle = false;
   let currentHasDocumentsToggle = false;
   let currentHasDetailedAiCounts = false;
+  let currentUsersLoaded = [];
 
   const stepProject = document.getElementById("step-project");
   const stepLogin = document.getElementById("step-login");
   const stepPanel = document.getElementById("step-panel");
+  const stepUserDetail = document.getElementById("step-user-detail");
   const subtitle = document.getElementById("subtitle");
   const loginAlert = document.getElementById("login-alert");
   const loginForm = document.getElementById("login-form");
@@ -435,6 +453,7 @@
     stepProject.classList.add("hidden");
     stepLogin.classList.add("hidden");
     stepPanel.classList.add("hidden");
+    stepUserDetail.classList.add("hidden");
     step.classList.remove("hidden");
   }
 
@@ -695,8 +714,21 @@
     }
   });
 
+  const buscaUsuarioInput = document.getElementById("busca-usuario");
+
+  function aplicarFiltroBusca() {
+    const termo = buscaUsuarioInput.value.trim().toLowerCase();
+    const filtrados = termo
+      ? currentUsersLoaded.filter(function (u) { return (u.email || "").toLowerCase().includes(termo); })
+      : currentUsersLoaded;
+    renderUsers(filtrados);
+  }
+
+  buscaUsuarioInput.addEventListener("input", aplicarFiltroBusca);
+
   async function loadUsers() {
     setAlert(panelAlert, "", null);
+    buscaUsuarioInput.value = "";
     usersContainer.innerHTML = '<p class="users-empty" id="users-loading">Carregando usuários...</p>';
 
     try {
@@ -717,7 +749,8 @@
       currentHasAiToggle = !!data.hasAiToggle;
       currentHasDocumentsToggle = !!data.hasDocumentsToggle;
       currentHasDetailedAiCounts = !!data.hasDetailedAiCounts;
-      renderUsers(data.users);
+      currentUsersLoaded = data.users || [];
+      aplicarFiltroBusca();
     } catch (err) {
       usersContainer.innerHTML = "";
       setAlert(panelAlert, "Erro ao carregar usuários: " + err.message, "error");
@@ -783,6 +816,7 @@
         "<td>" +
         "<button type=\"button\" class=\"reset-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Redefinir senha</button>" +
         "<button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button>" +
+        "<button type=\"button\" class=\"reset-btn manage-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Gerenciar em todos os módulos</button>" +
         "</td>" +
         "</tr>";
     });
@@ -796,9 +830,15 @@
       });
     });
 
-    usersContainer.querySelectorAll(".reset-btn").forEach(function (btn) {
+    usersContainer.querySelectorAll(".reset-btn:not(.manage-btn)").forEach(function (btn) {
       btn.addEventListener("click", function () {
         handleResetPassword(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
+      });
+    });
+
+    usersContainer.querySelectorAll(".manage-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        abrirGerenciarUsuario(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"));
       });
     });
 
@@ -984,6 +1024,121 @@
       setAlert(panelAlert, "Erro ao remover usuário: " + err.message, "error");
       btn.disabled = false;
       btn.textContent = "Remover";
+    }
+  }
+
+  const backToUsers = document.getElementById("back-to-users");
+  const detailAlert = document.getElementById("detail-alert");
+  const detailUserEmail = document.getElementById("detail-user-email");
+  const detailModulesContainer = document.getElementById("detail-modules-container");
+  let currentDetailUserId = null;
+  let currentDetailUserEmail = null;
+
+  async function abrirGerenciarUsuario(userId, email) {
+    currentDetailUserId = userId;
+    currentDetailUserEmail = email;
+    detailUserEmail.textContent = email;
+    setAlert(detailAlert, "", null);
+    showStep(stepUserDetail);
+    await carregarDetalheUsuario();
+  }
+
+  backToUsers.addEventListener("click", function () {
+    showStep(stepPanel);
+  });
+
+  async function carregarDetalheUsuario() {
+    detailModulesContainer.innerHTML = '<p class="users-empty">Carregando módulos...</p>';
+    try {
+      const resp = await fetch("/api/users/detail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken, userId: currentDetailUserId })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        detailModulesContainer.innerHTML = "";
+        setAlert(detailAlert, data.error || "Erro ao carregar módulos do usuário.", "error");
+        return;
+      }
+      renderModulosDetalhe(data.modules);
+    } catch (err) {
+      detailModulesContainer.innerHTML = "";
+      setAlert(detailAlert, "Erro ao carregar módulos do usuário: " + err.message, "error");
+    }
+  }
+
+  function renderModulosDetalhe(modules) {
+    let html = "";
+    modules.forEach(function (m) {
+      const modChkId = "detail-mod-" + m.key;
+      const aiChkId = "detail-ai-" + m.key;
+      const docChkId = "detail-doc-" + m.key;
+      html += '<div style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;">' +
+        "<strong>" + escapeHtml(m.label) + "</strong>" +
+        '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
+        '<label class="ai-toggle-label" for="' + modChkId + '">' +
+        '<input type="checkbox" id="' + modChkId + '" class="detail-module-toggle" data-module="' + escapeHtml(m.key) + '"' + (m.habilitado ? " checked" : "") + ">" +
+        "Módulo habilitado</label>" +
+        (m.hasAiToggle ?
+          '<label class="ai-toggle-label" for="' + aiChkId + '">' +
+          '<input type="checkbox" id="' + aiChkId + '" class="detail-ai-toggle" data-module="' + escapeHtml(m.key) + '"' + (m.ai_enabled ? " checked" : "") + ">" +
+          "Acesso à IA</label>"
+          : "") +
+        (m.hasDocumentsToggle ?
+          '<label class="ai-toggle-label" for="' + docChkId + '">' +
+          '<input type="checkbox" id="' + docChkId + '" class="detail-doc-toggle" data-module="' + escapeHtml(m.key) + '"' + (m.documents_enabled ? " checked" : "") + ">" +
+          "Envio de documentos</label>"
+          : "") +
+        "</div></div>";
+    });
+    detailModulesContainer.innerHTML = html;
+
+    detailModulesContainer.querySelectorAll(".detail-module-toggle").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        salvarToggleDetalhe("/api/users/set-module-access", { habilitado: checkbox.checked }, checkbox, "Módulo");
+      });
+    });
+    detailModulesContainer.querySelectorAll(".detail-ai-toggle").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        salvarToggleDetalhe("/api/users/set-ai-access", { aiEnabled: checkbox.checked }, checkbox, "Acesso à IA");
+      });
+    });
+    detailModulesContainer.querySelectorAll(".detail-doc-toggle").forEach(function (checkbox) {
+      checkbox.addEventListener("change", function () {
+        salvarToggleDetalhe("/api/users/set-documents-access", { documentsEnabled: checkbox.checked }, checkbox, "Envio de documentos");
+      });
+    });
+  }
+
+  async function salvarToggleDetalhe(endpoint, extraBody, checkbox, label) {
+    const novoValor = checkbox.checked;
+    checkbox.disabled = true;
+    setAlert(detailAlert, "", null);
+
+    const body = Object.assign(
+      { module: checkbox.getAttribute("data-module"), accessToken: currentAccessToken, userId: currentDetailUserId },
+      extraBody
+    );
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        checkbox.checked = !novoValor;
+        setAlert(detailAlert, data.error || ("Erro ao atualizar " + label + "."), "error");
+        return;
+      }
+      setAlert(detailAlert, label + " " + (novoValor ? "ativado" : "desativado") + " para " + currentDetailUserEmail + ".", "ok");
+    } catch (err) {
+      checkbox.checked = !novoValor;
+      setAlert(detailAlert, "Erro ao atualizar " + label + ": " + err.message, "error");
+    } finally {
+      checkbox.disabled = false;
     }
   }
 
