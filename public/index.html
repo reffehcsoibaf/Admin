@@ -329,6 +329,10 @@
     <section id="step-project" class="hidden project-choice" aria-label="Escolha do módulo">
       <div id="project-alert"></div>
 
+      <div id="bloco-uso-projeto" style="margin-bottom:20px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;color:var(--text-dim);">
+        <div id="uso-projeto-texto">Carregando uso do projeto...</div>
+      </div>
+
       <div id="bloco-autocadastro" style="margin-bottom:20px;padding:12px;border:1px solid var(--border);border-radius:8px;">
         <label class="ai-toggle-label" for="toggle-autocadastro" style="font-weight:600;">
           <input type="checkbox" id="toggle-autocadastro">
@@ -386,7 +390,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v1.3.0</footer>
+  <footer class="version-footer">Painel Admin v1.4.0</footer>
 </main>
 
 <script>
@@ -471,6 +475,37 @@
   }
 
   const toggleAutocadastro = document.getElementById("toggle-autocadastro");
+  const usoProjetoTexto = document.getElementById("uso-projeto-texto");
+
+  function formatUso(bytes, quotaBytes, label) {
+    const mb = bytes / (1024 * 1024);
+    const quotaMb = quotaBytes / (1024 * 1024);
+    const pct = quotaBytes > 0 ? (bytes / quotaBytes) * 100 : 0;
+    const mbTexto = mb < 0.1 ? "< 0.1" : mb.toFixed(1);
+    const quotaTexto = quotaMb >= 1024 ? (quotaMb / 1024).toFixed(0) + " GB" : quotaMb.toFixed(0) + " MB";
+    return label + ": " + mbTexto + " MB de " + quotaTexto + " (" + pct.toFixed(1) + "%)";
+  }
+
+  async function carregarUsoProjeto() {
+    usoProjetoTexto.textContent = "Carregando uso do projeto...";
+    try {
+      const resp = await fetch("/api/uso-projeto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        usoProjetoTexto.textContent = "Não foi possível carregar o uso do projeto.";
+        return;
+      }
+      const linhaStorage = formatUso(data.storage_bytes, 1024 * 1024 * 1024, "Armazenamento de arquivos");
+      const linhaDb = formatUso(data.database_bytes, 500 * 1024 * 1024, "Banco de dados");
+      usoProjetoTexto.innerHTML = linhaStorage + "<br>" + linhaDb;
+    } catch (err) {
+      usoProjetoTexto.textContent = "Erro ao carregar uso do projeto: " + err.message;
+    }
+  }
 
   async function carregarConfigAutocadastro() {
     toggleAutocadastro.disabled = true;
@@ -526,6 +561,7 @@
     subtitle.textContent = "Escolha o módulo que deseja gerenciar.";
     showStep(stepProject);
     carregarConfigAutocadastro();
+    carregarUsoProjeto();
   });
 
   loginForm.addEventListener("submit", async function (e) {
@@ -580,6 +616,7 @@
       subtitle.textContent = "Escolha o módulo que deseja gerenciar.";
       showStep(stepProject);
       carregarConfigAutocadastro();
+      carregarUsoProjeto();
       statusLine.textContent = "";
     } catch (err) {
       setAlert(loginAlert, "Erro inesperado: " + err.message, "error");
@@ -908,7 +945,7 @@
       const box = document.createElement("div");
       box.className = "new-password-box";
       box.setAttribute("role", "alert");
-      box.innerHTML = "Nova senha para <strong>" + escapeHtml(email) + "</strong>: <strong>" + escapeHtml(newPassword) + "</strong> — copie e envie ao usuário por fora do painel.";
+      box.innerHTML = "Nova senha temporária para <strong>" + escapeHtml(email) + "</strong>: <strong>" + escapeHtml(newPassword) + "</strong> — copie e envie ao usuário por fora do painel, avisando para trocá-la assim que possível.";
       panelAlert.appendChild(box);
     } catch (err) {
       setAlert(panelAlert, "Erro ao redefinir senha: " + err.message, "error");

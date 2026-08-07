@@ -253,6 +253,28 @@ async function setSignupConfig(env, allowSignup) {
   }
 }
 
+async function getUsoTotalProjeto(serviceRoleKey) {
+  const resp = await fetch(HUB.url + "/rest/v1/rpc/uso_total_projeto", {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey,
+      "Content-Type": "application/json"
+    },
+    body: "{}"
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao consultar uso do projeto: " + text);
+  }
+  const rows = await resp.json();
+  const row = rows[0] || {};
+  return {
+    storage_bytes: Number(row.storage_bytes) || 0,
+    database_bytes: Number(row.database_bytes) || 0
+  };
+}
+
 async function createUser(serviceRoleKey, email, password) {
   const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
     method: "POST",
@@ -363,6 +385,11 @@ export default {
           hasDocumentsToggle: !!mod.hasDocumentsToggle,
           hasDetailedAiCounts: !!mod.hasDetailedAiCounts
         });
+      }
+
+      if (url.pathname === "/api/uso-projeto" && request.method === "POST") {
+        const uso = await getUsoTotalProjeto(serviceRoleKey);
+        return jsonResponse(uso);
       }
 
       if (url.pathname === "/api/auth-config" && request.method === "POST") {

@@ -4,6 +4,19 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.4.0 — 2026-08-04
+
+- Bloco de "uso do projeto" na tela de escolha de módulo: mostra MB usados
+  de armazenamento de arquivos (todos os buckets) e de banco de dados,
+  comparado às cotas do plano gratuito do Supabase (1 GB e 500 MB)
+- Calculado direto via SQL (`uso_total_projeto()`), sem depender da
+  Management API
+
+## v1.3.1 — 2026-08-04
+
+- Mensagem de redefinição de senha ajustada para deixar claro que é uma
+  senha temporária, orientando o admin a avisar o usuário para trocá-la
+
 ## v1.3.0 — 2026-08-04
 
 - "Criar novo usuário" e "Permitir autocadastro" movidos da tela de um
