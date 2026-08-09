@@ -4,6 +4,14 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.8.0 — 2026-08-05
+
+- Toggle "É administrador" na tela "Gerenciar usuário", permitindo
+  conceder ou remover acesso ao próprio painel admin sem precisar do SQL
+  Editor do Supabase
+- Proteção: não é possível remover a própria permissão de administrador
+  por essa tela (evita se trancar fora do painel sem querer)
+
 ## v1.7.0 — 2026-08-05
 
 - Busca de usuário por e-mail movida para a tela inicial (antes do login,

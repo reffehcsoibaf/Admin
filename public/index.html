@@ -418,6 +418,14 @@
       <h2>Gerenciar usuário</h2>
       <p class="meta" id="detail-user-email"></p>
       <div id="detail-alert"></div>
+
+      <div id="bloco-is-admin" style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;">
+        <label class="ai-toggle-label" for="toggle-is-admin" style="font-weight:600;">
+          <input type="checkbox" id="toggle-is-admin">
+          É administrador (pode entrar neste painel)
+        </label>
+      </div>
+
       <div id="detail-modules-container">
         <p class="users-empty">Carregando módulos...</p>
       </div>
@@ -427,7 +435,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v1.7.0</footer>
+  <footer class="version-footer">Painel Admin v1.8.0</footer>
 </main>
 
 <script>
@@ -1137,6 +1145,7 @@
   const detailAlert = document.getElementById("detail-alert");
   const detailUserEmail = document.getElementById("detail-user-email");
   const detailModulesContainer = document.getElementById("detail-modules-container");
+  const toggleIsAdmin = document.getElementById("toggle-is-admin");
   let currentDetailUserId = null;
   let currentDetailUserEmail = null;
 
@@ -1150,11 +1159,39 @@
   }
 
   backToUsers.addEventListener("click", function () {
-    showStep(stepPanel);
+    // Se veio da busca global (nenhum módulo selecionado ainda), volta pra
+    // tela inicial em vez da lista de um módulo específico.
+    showStep(currentModuleKey ? stepPanel : stepProject);
+  });
+
+  toggleIsAdmin.addEventListener("change", async function () {
+    const novoValor = toggleIsAdmin.checked;
+    toggleIsAdmin.disabled = true;
+    setAlert(detailAlert, "", null);
+    try {
+      const resp = await fetch("/api/users/set-is-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken, userId: currentDetailUserId, isAdmin: novoValor })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        toggleIsAdmin.checked = !novoValor;
+        setAlert(detailAlert, data.error || "Erro ao atualizar permissão de administrador.", "error");
+        return;
+      }
+      setAlert(detailAlert, (novoValor ? "Agora " : "Deixou de ser ") + currentDetailUserEmail + (novoValor ? " é administrador." : " administrador."), "ok");
+    } catch (err) {
+      toggleIsAdmin.checked = !novoValor;
+      setAlert(detailAlert, "Erro ao atualizar permissão de administrador: " + err.message, "error");
+    } finally {
+      toggleIsAdmin.disabled = false;
+    }
   });
 
   async function carregarDetalheUsuario() {
     detailModulesContainer.innerHTML = '<p class="users-empty">Carregando módulos...</p>';
+    toggleIsAdmin.disabled = true;
     try {
       const resp = await fetch("/api/users/detail", {
         method: "POST",
@@ -1167,6 +1204,8 @@
         setAlert(detailAlert, data.error || "Erro ao carregar módulos do usuário.", "error");
         return;
       }
+      toggleIsAdmin.checked = data.isAdmin === true;
+      toggleIsAdmin.disabled = false;
       renderModulosDetalhe(data.modules);
     } catch (err) {
       detailModulesContainer.innerHTML = "";

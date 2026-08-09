@@ -311,6 +311,13 @@ async function getUserDetail(serviceRoleKey, userId) {
   }
   const userData = await userResp.json();
 
+  const profileResp = await fetch(
+    HUB.url + "/rest/v1/profiles?id=eq." + userId + "&select=is_admin",
+    { headers: { apikey: serviceRoleKey, Authorization: "Bearer " + serviceRoleKey } }
+  );
+  const profileRows = profileResp.ok ? await profileResp.json() : [];
+  const isAdmin = profileRows.length ? profileRows[0].is_admin === true : false;
+
   const modResp = await fetch(
     HUB.url + "/rest/v1/profiles_modulos?user_id=eq." + userId + "&select=modulo,habilitado,ai_enabled,documents_enabled",
     { headers: { apikey: serviceRoleKey, Authorization: "Bearer " + serviceRoleKey } }
@@ -333,7 +340,25 @@ async function getUserDetail(serviceRoleKey, userId) {
     };
   });
 
-  return { id: userId, email: userData.email, modules: modules };
+  return { id: userId, email: userData.email, isAdmin: isAdmin, modules: modules };
+}
+
+async function setUserIsAdmin(serviceRoleKey, userId, isAdmin) {
+  const resp = await fetch(HUB.url + "/rest/v1/profiles?id=eq." + userId, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal"
+    },
+    body: JSON.stringify({ is_admin: isAdmin })
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao atualizar permissão de administrador: " + text);
+  }
 }
 
 async function createUser(serviceRoleKey, email, password) {
@@ -500,6 +525,14 @@ export default {
       if (url.pathname === "/api/users/detail" && request.method === "POST") {
         const detail = await getUserDetail(serviceRoleKey, body.userId);
         return jsonResponse(detail);
+      }
+
+      if (url.pathname === "/api/users/set-is-admin" && request.method === "POST") {
+        if (body.userId === auth.userId && body.isAdmin !== true) {
+          return jsonResponse({ error: "Você não pode remover sua própria permissão de administrador por aqui." }, 400);
+        }
+        await setUserIsAdmin(serviceRoleKey, body.userId, body.isAdmin === true);
+        return jsonResponse({ ok: true });
       }
 
       if (url.pathname === "/api/users/set-module-access" && request.method === "POST") {
