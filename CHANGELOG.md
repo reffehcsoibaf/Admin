@@ -4,6 +4,13 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.7.0 — 2026-08-05
+
+- Busca de usuário por e-mail movida para a tela inicial (antes do login,
+  logo depois, sem precisar escolher módulo), com resultados abrindo
+  direto na tela "Gerenciar usuário" — não é mais necessário entrar num
+  módulo específico primeiro para localizar e gerenciar alguém
+
 ## v1.6.0 — 2026-08-05
 
 - Botão "Editar e-mail" ao lado de "Redefinir senha" em cada usuário,

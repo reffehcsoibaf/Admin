@@ -293,6 +293,19 @@
     padding: 12px 0;
   }
 
+  .busca-resultado-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+
+  .busca-resultado-item:last-child {
+    border-bottom: none;
+  }
+
   footer.version-footer {
     text-align: center;
     color: var(--text-dim);
@@ -328,6 +341,14 @@
     <!-- Etapa 2: escolha do módulo a gerenciar -->
     <section id="step-project" class="hidden project-choice" aria-label="Escolha do módulo">
       <div id="project-alert"></div>
+
+      <div id="bloco-busca-global" style="margin-bottom:20px;">
+        <div class="field">
+          <label for="busca-global-usuario">Buscar usuário por e-mail</label>
+          <input type="search" id="busca-global-usuario" placeholder="Digite parte do e-mail...">
+        </div>
+        <div id="busca-global-resultados"></div>
+      </div>
 
       <div id="bloco-uso-projeto" style="margin-bottom:20px;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:0.85rem;color:var(--text-dim);">
         <div id="uso-projeto-texto">Carregando uso do projeto...</div>
@@ -406,7 +427,7 @@
   </div>
 
   <p class="status-line" id="status-line" role="status" aria-live="polite"></p>
-  <footer class="version-footer">Painel Admin v1.6.0</footer>
+  <footer class="version-footer">Painel Admin v1.7.0</footer>
 </main>
 
 <script>
@@ -523,6 +544,53 @@
       usoProjetoTexto.innerHTML = linhaStorage + "<br>" + linhaDb;
     } catch (err) {
       usoProjetoTexto.textContent = "Erro ao carregar uso do projeto: " + err.message;
+    }
+  }
+
+  const buscaGlobalInput = document.getElementById("busca-global-usuario");
+  const buscaGlobalResultados = document.getElementById("busca-global-resultados");
+  let buscaGlobalTimeout = null;
+
+  buscaGlobalInput.addEventListener("input", function () {
+    clearTimeout(buscaGlobalTimeout);
+    const termo = buscaGlobalInput.value.trim();
+    if (!termo) {
+      buscaGlobalResultados.innerHTML = "";
+      return;
+    }
+    buscaGlobalTimeout = setTimeout(function () { executarBuscaGlobal(termo); }, 300);
+  });
+
+  async function executarBuscaGlobal(termo) {
+    buscaGlobalResultados.innerHTML = '<p class="users-empty">Buscando...</p>';
+    try {
+      const resp = await fetch("/api/users/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessToken: currentAccessToken, query: termo })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        buscaGlobalResultados.innerHTML = '<p class="users-empty">' + escapeHtml(data.error || "Erro ao buscar.") + "</p>";
+        return;
+      }
+      if (!data.users.length) {
+        buscaGlobalResultados.innerHTML = '<p class="users-empty">Nenhum usuário encontrado.</p>';
+        return;
+      }
+      buscaGlobalResultados.innerHTML = data.users.map(function (u) {
+        return '<div class="busca-resultado-item">' +
+          "<span>" + escapeHtml(u.email || "—") + "</span>" +
+          '<button type="button" class="reset-btn busca-gerenciar-btn" data-user-id="' + escapeHtml(u.id) + '" data-user-email="' + escapeHtml(u.email || "") + '">Gerenciar</button>' +
+          "</div>";
+      }).join("");
+      buscaGlobalResultados.querySelectorAll(".busca-gerenciar-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          abrirGerenciarUsuario(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"));
+        });
+      });
+    } catch (err) {
+      buscaGlobalResultados.innerHTML = '<p class="users-empty">Erro ao buscar: ' + escapeHtml(err.message) + "</p>";
     }
   }
 

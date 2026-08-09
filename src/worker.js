@@ -109,6 +109,29 @@ async function requireAdmin(accessToken, env) {
   return { ok: true, userId: userId };
 }
 
+async function searchUsers(serviceRoleKey, termo) {
+  const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: "Bearer " + serviceRoleKey
+    }
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error("Falha ao buscar usuários: " + text);
+  }
+
+  const data = await resp.json();
+  const rawUsers = data.users || data || [];
+  const termoLower = termo.toLowerCase();
+
+  return rawUsers
+    .filter(function (u) { return (u.email || "").toLowerCase().includes(termoLower); })
+    .map(function (u) { return { id: u.id, email: u.email, created_at: u.created_at }; })
+    .slice(0, 20);
+}
+
 async function listUsers(mod, serviceRoleKey) {
   const resp = await fetch(HUB.url + "/auth/v1/admin/users", {
     headers: {
@@ -429,6 +452,13 @@ export default {
       }
 
       const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_HUB;
+
+      if (url.pathname === "/api/users/search" && request.method === "POST") {
+        const termo = (body.query || "").trim();
+        if (!termo) return jsonResponse({ users: [] });
+        const resultados = await searchUsers(serviceRoleKey, termo);
+        return jsonResponse({ users: resultados });
+      }
 
       if (url.pathname === "/api/users" && request.method === "POST") {
         if (!mod) return jsonResponse({ error: "Módulo inválido." }, 400);
