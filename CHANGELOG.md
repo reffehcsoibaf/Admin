@@ -4,6 +4,15 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.6.0 — 2026-08-05
+
+- Botão "Editar e-mail" ao lado de "Redefinir senha" em cada usuário,
+  trocando o e-mail instantaneamente via Admin API (sem precisar de
+  confirmação por e-mail)
+- Motivação: permitir alinhar o e-mail de uma conta existente ao e-mail de
+  um provedor social (ex: Google), possibilitando o vínculo automático que
+  o Supabase faz quando os e-mails coincidem
+
 ## v1.5.0 — 2026-08-04
 
 - Campo de busca por e-mail (ou parte dele) na lista de usuários de cada
