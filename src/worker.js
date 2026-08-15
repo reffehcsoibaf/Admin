@@ -43,6 +43,20 @@ const MODULES = {
     hasDetailedAiCounts: false,
     hasDocumentsToggle: true,
     bucket: "documentos_saude"
+  },
+  contracheque: {
+    label: "Contracheque",
+    modulo: "contracheque",
+    recordsTable: "contracheque_lancamentos_mes",
+    recordsLabel: "Lançamentos",
+    // Sem toggle de IA nem de documentos: o app do contracheque não checa
+    // ai_enabled/documents_enabled hoje (diferente de Banca Pro/Financeiro/
+    // Saúde). Só "habilitado" é de fato gated (via modulo_habilitado() na
+    // RLS). Se os outros toggles forem implementados lá, ligar aqui.
+    hasAiToggle: false,
+    hasDetailedAiCounts: false,
+    hasDocumentsToggle: false,
+    bucket: "contracheque-documentos"
   }
 };
 
