@@ -4,6 +4,18 @@ Todas as mudanças notáveis deste projeto são registradas aqui.
 Numeração: v1.0.0 fica reservado para quando o conjunto inicial de
 funcionalidades administrativas planejadas estiver completo.
 
+## v1.9.0 — 2026-08-17
+
+- **Remoção:** Botão "Redefinir senha" — Com migração para autenticação
+  exclusiva via Google OAuth, não há mais senhas gerenciadas pelo Supabase.
+  Usuários resetam senha no Google se necessário
+- **Remoção:** Funcionalidade "Criar novo usuário" — Novos usuários agora se
+  registram automaticamente ao fazer primeiro login com Google (ou outros
+  provedores sociais). Não há mais necessidade de criar manualmente no painel
+- **Remoção:** Botão "Editar e-mail" — O e-mail é controlado pelo provedor
+  de identidade (Google). Permitir edição manual causaria inconsistências
+  entre Supabase e a identidade social. Usuários trocam de e-mail no Google
+
 ## v1.8.0 — 2026-08-05
 
 - Toggle "É administrador" na tela "Gerenciar usuário", permitindo
