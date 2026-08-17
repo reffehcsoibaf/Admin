@@ -408,23 +408,6 @@ async function deleteUser(serviceRoleKey, userId) {
   }
 }
 
-async function resetPassword(serviceRoleKey, userId, newPassword) {
-  const resp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
-    method: "PUT",
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: "Bearer " + serviceRoleKey,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ password: newPassword })
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error("Falha ao redefinir senha: " + text);
-  }
-}
-
 async function editUserEmail(serviceRoleKey, userId, newEmail) {
   const resp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
     method: "PUT",
@@ -576,15 +559,6 @@ export default {
           return jsonResponse({ error: "Você não pode remover a si mesmo por aqui." }, 400);
         }
         await deleteUser(serviceRoleKey, body.userId);
-        return jsonResponse({ ok: true });
-      }
-
-      if (url.pathname === "/api/users/reset-password" && request.method === "POST") {
-        const newPassword = body.newPassword;
-        if (!newPassword || newPassword.length < 8) {
-          return jsonResponse({ error: "A nova senha precisa ter ao menos 8 caracteres." }, 400);
-        }
-        await resetPassword(serviceRoleKey, body.userId, newPassword);
         return jsonResponse({ ok: true });
       }
 
