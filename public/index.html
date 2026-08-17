@@ -345,24 +345,9 @@
           Permitir que qualquer pessoa se cadastre nos apps
         </label>
         <p style="color:var(--text-dim);font-size:0.85rem;margin:6px 0 0 0;">
-          Configuração única, vale para o Hub inteiro (não muda por módulo). Se desativado, só você consegue criar usuários — pelo botão "Criar novo usuário" abaixo.
+          Novos usuários se cadastram automaticamente ao fazer login com Google ou outros provedores de identidade.
         </p>
       </div>
-
-      <details id="bloco-criar-usuario" style="margin-bottom:20px;">
-        <summary style="cursor:pointer;font-weight:600;padding:8px 0;">+ Criar novo usuário</summary>
-        <form id="form-criar-usuario" style="margin-top:12px;">
-          <div class="field">
-            <label for="novo-usuario-email">E-mail do novo usuário</label>
-            <input type="email" id="novo-usuario-email" required>
-          </div>
-          <div class="field">
-            <label for="novo-usuario-senha">Senha inicial</label>
-            <input type="password" id="novo-usuario-senha" minlength="8" required>
-          </div>
-          <button type="submit" class="primary-btn" id="criar-usuario-submit">Criar usuário</button>
-        </form>
-      </details>
 
       <p style="font-weight:600;margin-bottom:8px;">Escolha o módulo para gerenciar usuários:</p>
       <button type="button" class="project-btn" data-project="banca">
@@ -462,8 +447,6 @@
   const panelMeta = document.getElementById("panel-meta");
   const panelAlert = document.getElementById("panel-alert");
   const projectAlert = document.getElementById("project-alert");
-  const formCriarUsuario = document.getElementById("form-criar-usuario");
-  const criarUsuarioSubmit = document.getElementById("criar-usuario-submit");
   const usersContainer = document.getElementById("users-container");
   const statusLine = document.getElementById("status-line");
 
@@ -746,39 +729,6 @@
     const mb = bytes / (1024 * 1024);
     return mb < 0.1 ? "< 0.1 MB" : mb.toFixed(1) + " MB";
   }
-
-  formCriarUsuario.addEventListener("submit", async function (e) {
-    e.preventDefault();
-    setAlert(projectAlert, "", null);
-    criarUsuarioSubmit.disabled = true;
-    criarUsuarioSubmit.textContent = "Criando...";
-
-    const email = document.getElementById("novo-usuario-email").value.trim();
-    const senha = document.getElementById("novo-usuario-senha").value;
-
-    try {
-      const resp = await fetch("/api/users/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken: currentAccessToken, email: email, password: senha })
-      });
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        setAlert(projectAlert, data.error || "Erro ao criar usuário.", "error");
-        return;
-      }
-
-      setAlert(projectAlert, "Usuário " + email + " criado com sucesso. Ele ainda não tem acesso a nenhum módulo — escolha um módulo abaixo e ative pelo toggle \"Módulo habilitado\" quando quiser liberar.", "ok");
-      formCriarUsuario.reset();
-      document.getElementById("bloco-criar-usuario").removeAttribute("open");
-    } catch (err) {
-      setAlert(projectAlert, "Erro ao criar usuário: " + err.message, "error");
-    } finally {
-      criarUsuarioSubmit.disabled = false;
-      criarUsuarioSubmit.textContent = "Criar usuário";
-    }
-  });
 
   const buscaUsuarioInput = document.getElementById("busca-usuario");
 
