@@ -390,23 +390,6 @@ async function deleteUser(serviceRoleKey, userId) {
   }
 }
 
-async function editUserEmail(serviceRoleKey, userId, newEmail) {
-  const resp = await fetch(HUB.url + "/auth/v1/admin/users/" + userId, {
-    method: "PUT",
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: "Bearer " + serviceRoleKey,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ email: newEmail, email_confirm: true })
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error("Falha ao editar e-mail: " + text);
-  }
-}
-
 // Grava um campo em profiles_modulos via upsert (a linha pode ainda não
 // existir para esse usuário x módulo — ex: usuário novo que nunca teve
 // nenhum módulo concedido). merge-duplicates faz update parcial, sem
@@ -532,15 +515,6 @@ export default {
         }
         await deleteUser(serviceRoleKey, body.userId);
         return jsonResponse({ ok: true });
-      }
-
-      if (url.pathname === "/api/users/edit-email" && request.method === "POST") {
-        const newEmail = (body.newEmail || "").trim();
-        if (!newEmail || !newEmail.includes("@")) {
-          return jsonResponse({ error: "Informe um e-mail válido." }, 400);
-        }
-        await editUserEmail(serviceRoleKey, body.userId, newEmail);
-        return jsonResponse({ ok: true, newEmail: newEmail });
       }
 
       return jsonResponse({ error: "Rota não encontrada." }, 404);

@@ -830,7 +830,6 @@
           : "") +
         "<td>" + (typeof u.records_count === "number" ? u.records_count : "—") + "</td>" +
         "<td>" +
-        "<button type=\"button\" class=\"reset-btn edit-email-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Editar e-mail</button>" +
         "<button type=\"button\" class=\"remove-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Remover</button>" +
         "<button type=\"button\" class=\"reset-btn manage-btn\" data-user-id=\"" + escapeHtml(u.id) + "\" data-user-email=\"" + escapeHtml(u.email || "") + "\">Gerenciar em todos os módulos</button>" +
         "</td>" +
@@ -843,12 +842,6 @@
     usersContainer.querySelectorAll(".remove-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         handleRemoveUser(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
-      });
-    });
-
-    usersContainer.querySelectorAll(".edit-email-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        handleEditEmail(btn.getAttribute("data-user-id"), btn.getAttribute("data-user-email"), btn);
       });
     });
 
@@ -958,37 +951,6 @@
       setAlert(panelAlert, "Erro ao atualizar acesso a documentos: " + err.message, "error");
     } finally {
       checkbox.disabled = false;
-    }
-  }
-
-  async function handleEditEmail(userId, email, btn) {
-    const novoEmail = window.prompt("Novo e-mail para " + email + ":", email);
-    if (!novoEmail || novoEmail.trim() === "" || novoEmail.trim() === email) return;
-
-    btn.disabled = true;
-    btn.textContent = "Salvando...";
-    setAlert(panelAlert, "", null);
-
-    try {
-      const resp = await fetch("/api/users/edit-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken: currentAccessToken, userId: userId, newEmail: novoEmail.trim() })
-      });
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        setAlert(panelAlert, data.error || "Erro ao editar e-mail.", "error");
-        return;
-      }
-
-      setAlert(panelAlert, "E-mail atualizado para " + escapeHtml(data.newEmail) + ".", "ok");
-      loadUsers();
-    } catch (err) {
-      setAlert(panelAlert, "Erro ao editar e-mail: " + err.message, "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Editar e-mail";
     }
   }
 
